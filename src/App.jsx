@@ -1,17 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import {
-  loginOrCreateUser,
-  registerHorse,
-  markHorsesPaid,
-  getMyHorses,
-  getPaidHorses,
-  getAllHorses,
-  approveHorse,
-  deleteHorse,
-  getAdminStats,
-  saveDeadline,
-  getDeadline,
-  clearDeadline,
+  loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses,
+  getPaidHorses, getAllHorses, approveHorse, deleteHorse,
+  getAdminStats, saveDeadline, getDeadline, clearDeadline,
 } from "./firebase/db";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -322,17 +313,9 @@ export default function App() {
     const phone = document.getElementById("rp")?.value?.trim();
     if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
     if(!phone||phone.length<8){showToast("Гар утасны дугаар оруулна уу");return;}
-    try {
-      const fbUser = await loginOrCreateUser({surname, givenName:name, phone});
-      setUser({...fbUser, givenName:name, surname});
-      setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
-      // Load user's existing horses from Firebase
-      const horses = await getMyHorses(phone);
-      const byAge = {};
-      horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push({...h,paid:h.paid}); });
-      setAllReg(byAge);
-      showToast("Тавтай морилно уу!");
-    } catch(e) { showToast("Алдаа гарлаа: "+e.message); }
+    setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
+    setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
+    showToast("Тавтай морилно уу!");
   };
   const doLogin = async () => {
     const surname = document.getElementById("ls")?.value?.trim();
@@ -340,31 +323,15 @@ export default function App() {
     const phone = document.getElementById("lp")?.value?.trim();
     if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
     if(!phone||phone.length<8){showToast("Гар утасны дугаар оруулна уу");return;}
-    try {
-      const fbUser = await loginOrCreateUser({surname, givenName:name, phone});
-      setUser({...fbUser, givenName:name, surname});
-      setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
-      const horses = await getMyHorses(phone);
-      const byAge = {};
-      horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
-      setAllReg(byAge);
-      showToast("Тавтай морилно уу!");
-    } catch(e) { showToast("Алдаа гарлаа: "+e.message); }
+    setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
+    setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
+    showToast("Тавтай морилно уу!");
   };
   const doAdminLogin = async () => {
     const u = document.getElementById("au")?.value?.trim();
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
       setUser({name:"Админ"}); setRole("admin"); setScreen("admin"); setActiveNav("admin");
-      // Load all horses and deadline from Firebase
-      try {
-        const allH = await getAllHorses();
-        const byAge = {};
-        allH.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
-        setAllReg(byAge);
-        const dl = await getDeadline();
-        if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
-      } catch(e){ console.error("Firebase load:", e); }
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
@@ -468,11 +435,6 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
-    // Save to Firebase immediately (unpaid)
-    try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm, number:num, needsPayment});
-      setPendingHorses(p=>p.map(h=>h.id===horse.id ? {...h, fbId: fbHorse.id} : h));
-    } catch(e) { console.error("Firebase save error:", e); }
     setScreen("numReveal");
   };
 
@@ -485,26 +447,17 @@ export default function App() {
   };
 
   // Generate a unique transaction reference ID shown to user
-  const doSubmitPayment = async () => {
+  const doSubmitPayment=async()=>{
     setPayLoading(true);
-    try {
-      // Mark all pending horses as paid in Firebase
-      const fbIds = pendingHorses.map(h=>h.fbId).filter(Boolean);
-      if (fbIds.length) await markHorsesPaid(fbIds);
-      const paid = pendingHorses.map(h=>({...h,paid:true}));
+    setTimeout(()=>{
+      const paid=pendingHorses.map(h=>({...h,paid:true}));
       setAllReg(prev=>{
         const n={...prev};
         paid.forEach(h=>{if(!n[h.ageGroupId])n[h.ageGroupId]=[];n[h.ageGroupId]=[...n[h.ageGroupId],h];});
         return n;
       });
-      setPendingHorses([]);
-      setPayLoading(false);
-      setScreen("success");
-      showToast("Бүртгэл амжилттай!");
-    } catch(e) {
-      setPayLoading(false);
-      showToast("Алдаа гарлаа: "+e.message);
-    }
+      setPendingHorses([]);setPayLoading(false);setScreen("success");showToast("Бүртгэл амжилттай!");
+    },800);
   };
 
   // ── EXPORT CSV ──────────────────────────────────────────────────────────────
@@ -1132,8 +1085,9 @@ export default function App() {
               <div id="success-card" style={{
                 maxWidth:"480px",width:"100%",margin:"0 auto",
                 background:"linear-gradient(160deg,#0a1a5e 0%,#0d1c6e 100%)",
-                border:"2px solid var(--gold)",borderRadius:"20px",padding:"28px 24px",
-                fontFamily:"'Nunito',sans-serif",color:"#fff"
+                border:"2px solid #e8c060",borderRadius:"20px",padding:"28px 24px",
+                fontFamily:"Arial,sans-serif",color:"#fff",
+                boxShadow:"0 0 40px rgba(232,192,96,.2)"
               }}>
                 {/* Header */}
                 <div style={{textAlign:"center",borderBottom:"1px solid rgba(232,192,96,.3)",paddingBottom:"16px",marginBottom:"16px"}}>
@@ -1181,25 +1135,42 @@ export default function App() {
 
                 {/* Footer */}
                 <div style={{textAlign:"center",marginTop:"16px",paddingTop:"14px",borderTop:"1px solid rgba(232,192,96,.2)",fontSize:"11px",color:"rgba(255,255,255,.45)",lineHeight:1.6}}>
-                  Энэ баримтыг хадгалж, цамц авах үед үзүүлнэ үү.<br/>
-                  Дугаартай цамцаа авахдаа дээрх дугаараа заана уу.
+                  Энэ баримтыг хадгалж, цамц авах үед үзүүлнэ үү. Дугаартай цамцаа авахдаа дээрх дугаараа заана уу.
                 </div>
               </div>
 
               {/* Action buttons */}
               <div style={{maxWidth:"480px",width:"100%",margin:"14px auto 0",display:"flex",flexDirection:"column",gap:"10px"}}>
                 <button className="btn-gold" style={{marginTop:0,display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}
-                  onClick={()=>{
+                  onClick={async()=>{
                     const el=document.getElementById("success-card");
                     if(!el) return;
-                    const original=document.body.innerHTML;
-                    const printStyle=`<style>body{margin:0;background:#0a1a5e;display:flex;justify-content:center;padding:20px;}@media print{body{background:#0a1a5e!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style>`;
-                    document.body.innerHTML=printStyle+el.outerHTML;
-                    window.print();
-                    document.body.innerHTML=original;
-                    window.location.reload();
+                    // Dynamically load html2canvas
+                    if(!window.html2canvas){
+                      await new Promise((res,rej)=>{
+                        const s=document.createElement("script");
+                        s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+                        s.onload=res; s.onerror=rej;
+                        document.head.appendChild(s);
+                      });
+                    }
+                    try {
+                      const canvas = await window.html2canvas(el, {
+                        backgroundColor:"#0a1a5e",
+                        scale:2,
+                        useCORS:true,
+                        logging:false,
+                      });
+                      const link=document.createElement("a");
+                      link.download=`дугаар_${allHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join("-")}.png`;
+                      link.href=canvas.toDataURL("image/png");
+                      link.click();
+                    } catch(e){
+                      // Fallback to print
+                      window.print();
+                    }
                   }}>
-                  🖨️ Хэвлэх / Хадгалах
+                  📥 Зураг болгон хадгалах
                 </button>
                 <button className="btn-ghost" style={{width:"100%"}} onClick={()=>goNav("dashboard","dashboard")}>
                   Нүүр хуудас руу →
@@ -1496,24 +1467,71 @@ export default function App() {
                 <button className="modal-close" onClick={()=>setAdminHorse(null)}>×</button>
               </div>
               {adminHorse.horseImage&&<img src={adminHorse.horseImage} style={{width:"100%",maxHeight:"260px",objectFit:"contain",background:"rgba(0,0,0,0.2)",borderRadius:"9px",marginBottom:"14px"}} alt="horse"/>}
+              {/* Payment verification box */}
+              <div style={{
+                background: adminHorse.approved
+                  ? "rgba(39,174,96,.12)"
+                  : adminHorse.paid
+                    ? "rgba(232,192,96,.1)"
+                    : "rgba(192,57,43,.1)",
+                border: `1px solid ${adminHorse.approved ? "rgba(39,174,96,.4)" : adminHorse.paid ? "var(--border-gold)" : "rgba(192,57,43,.35)"}`,
+                borderRadius:"12px", padding:"14px 16px", marginBottom:"16px"
+              }}>
+                <div style={{fontSize:"12px",color:"var(--white-dim)",marginBottom:"8px",fontWeight:700,textTransform:"uppercase",letterSpacing:"1px"}}>
+                  {adminHorse.approved ? "✅ Баталгаажсан" : adminHorse.paid ? "⏳ Баталгаажуулах хүлээгдэж байна" : "❌ Төлбөр хийгдээгүй"}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
+                  <div>
+                    <div style={{fontSize:"11px",color:"var(--white-dim)"}}>Бүртгэлийн дугаар</div>
+                    <div style={{fontFamily:"'Cinzel',serif",fontSize:"24px",color:"var(--gold)",fontWeight:700}}>{adminHorse.number}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:"11px",color:"var(--white-dim)"}}>Төлбөрийн дүн</div>
+                    <div style={{fontFamily:"'Cinzel',serif",fontSize:"18px",color:adminHorse.needsPayment===false?"#2ecc71":"var(--gold)",fontWeight:700}}>
+                      {adminHorse.needsPayment===false ? "Үнэгүй" : "50,000₮"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:"11px",color:"var(--white-dim)"}}>Эзний утас</div>
+                    <div style={{fontSize:"14px",fontWeight:700}}>{adminHorse.ownerPhone||"—"}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:"11px",color:"var(--white-dim)"}}>Даатгалын дугаар</div>
+                    <div style={{fontSize:"14px",fontWeight:700}}>***{adminHorse.insurance||"—"}</div>
+                  </div>
+                </div>
+                {!adminHorse.approved && adminHorse.paid && (
+                  <div style={{marginTop:"10px",fontSize:"12px",color:"#f5d882",lineHeight:1.6,padding:"8px 10px",background:"rgba(232,192,96,.08)",borderRadius:"8px"}}>
+                    💡 Банкны апп дээр гүйлгээний утгад <strong>{adminHorse.number}</strong> гэж байвал зөвшөөрнө үү.
+                  </div>
+                )}
+              </div>
+
               {[
-                ["Дугаар",adminHorse.number],["Насны ангилал",adminHorse.ageGroupName],
-                ["Морины нэр",adminHorse.horseName],["Өнгө",adminHorse.horseColor||"—"],
+                ["Морины нэр",adminHorse.horseName],
+                ["Насны ангилал",adminHorse.ageGroupName],
+                ["Өнгө",adminHorse.horseColor||"—"],
                 ["Эзний нэр",adminHorse.ownerName],
-                ["Эзний цол",adminHorse.ownerTitle||"—"],["Эзний утас",adminHorse.ownerPhone||"—"],
-                ["Регистр",adminHorse.ownerReg||"—"],["Уяачийн нэр",adminHorse.uyaachName||"—"],["Уралдаанч хүүхдийн нэр",adminHorse.riderName],["Уралдаанч регистр",adminHorse.riderReg||"—"],
+                ["Эзний цол",adminHorse.ownerTitle||"—"],
+                ["Уяачийн нэр",adminHorse.uyaachName||"—"],
+                ["Уралдаанч хүүхдийн нэр",adminHorse.riderName],
                 ["Уралдаанчийн нас",adminHorse.riderAge||"—"],
+                ["Уралдаанч регистр",adminHorse.riderReg||"—"],
                 ["Өмнөх амжилт/ түүх",adminHorse.history||"—"],
-                ["Зөвшөөрлийн бичиг", adminHorse.riderConsentName||adminHorse.riderConsent||"—"],
-                ["Даатгалын дугаар", adminHorse.insurance||"—"],
-                ["Төлбөр",adminHorse.paid?"✓ Төлсөн":"⏳ Хүлээгдэж буй"],
-                ["Зөвшөөрөл",adminHorse.approved?"✓ Зөвшөөрсөн":"Хүлээгдэж буй"],
               ].map(([l,v])=>(
                 <div key={l} className="detail-row"><span className="detail-lbl">{l}</span><span>{v}</span></div>
               ))}
+
               <div style={{display:"flex",gap:"8px",marginTop:"16px"}}>
                 {!adminHorse.approved&&adminHorse.paid&&(
-                  <button className="btn-gold" style={{flex:1,marginTop:0}} onClick={()=>{adminApprove(adminHorse);setAdminHorse(h=>({...h,approved:true}));}}>✓ Зөвшөөрөх</button>
+                  <button className="btn-gold" style={{flex:1,marginTop:0}} onClick={()=>{adminApprove(adminHorse);setAdminHorse(h=>({...h,approved:true}));}}>
+                    ✓ Зөвшөөрөх
+                  </button>
+                )}
+                {adminHorse.approved&&(
+                  <div style={{flex:1,textAlign:"center",padding:"12px",background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"10px",color:"#2ecc71",fontWeight:700,fontSize:"14px"}}>
+                    ✅ Баталгаажсан
+                  </div>
                 )}
                 <button className="btn-red" style={{flex:1}} onClick={()=>{adminReject(adminHorse);setAdminHorse(null);}}>✕ Цуцлах</button>
               </div>
