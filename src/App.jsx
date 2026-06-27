@@ -456,16 +456,19 @@ export default function App() {
     const myHorsesInThisAge = myAllHorses.filter(h=>h.ageGroupId===selectedAge.id).length;
     // Reuse number only if: user has a number AND this is first horse in this age group
     const reuseNumber = myFirstNumber && myHorsesInThisAge === 0;
-    const num = reuseNumber ? myFirstNumber : getNextNumber();
-    const needsPayment = !reuseNumber; // free only when reusing number in new age group
-    const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
-      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
-    setPendingHorses(p=>[...p,horse]);
-    // Save to Firebase
+    // Get atomic number from Firebase FIRST
+    let realNum = reuseNumber ? myFirstNumber : 0;
+    let realNeedsPayment = (reuseNumber === false);
+    let fbId = null;
     try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
-      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm, number:0, needsPayment:realNeedsPayment});
+      realNum = fbHorse.number;
+      realNeedsPayment = fbHorse.needsPayment;
+      fbId = fbHorse.id;
     } catch(e){ console.error("Firebase save error:", e); }
+    const horse={...hForm,number:realNum,needsPayment:realNeedsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
+      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random(),fbId};
+    setPendingHorses(p=>[...p,horse]);
     setScreen("numReveal");
   };
 
