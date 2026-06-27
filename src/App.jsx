@@ -5,7 +5,6 @@ import {
   saveDeadline, getDeadline, clearDeadline,
 } from "./firebase/db";
 
-
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "naadam2026";
@@ -254,7 +253,7 @@ export default function App() {
   // Registration deadline — admin sets this, stored in localStorage
   const [regDeadline, setRegDeadline] = useState(()=>{
     const saved = localStorage.getItem("naadam_reg_deadline");
-    return saved || null;
+    return saved || "2026-07-08T06:00";
   });
   const isRegClosed = regDeadline && new Date() > new Date(regDeadline);
 
@@ -457,19 +456,16 @@ export default function App() {
     const myHorsesInThisAge = myAllHorses.filter(h=>h.ageGroupId===selectedAge.id).length;
     // Reuse number only if: user has a number AND this is first horse in this age group
     const reuseNumber = myFirstNumber && myHorsesInThisAge === 0;
-    // Get atomic number from Firebase FIRST, then show
-    let realNum = reuseNumber ? myFirstNumber : 0;
-    let realNeedsPayment = !reuseNumber;
-    let fbId = null;
-    try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm, number:0, needsPayment:realNeedsPayment});
-      realNum = fbHorse.number; // Use Firebase atomic number
-      realNeedsPayment = fbHorse.needsPayment;
-      fbId = fbHorse.id;
-    } catch(e){ console.error("Firebase save error:", e); realNum = reuseNumber ? myFirstNumber : getNextNumber(); }
-    const horse={...hForm,number:realNum,needsPayment:realNeedsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
-      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random(),fbId};
+    const num = reuseNumber ? myFirstNumber : getNextNumber();
+    const needsPayment = !reuseNumber; // free only when reusing number in new age group
+    const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
+      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
+    // Save to Firebase
+    try {
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
+      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
+    } catch(e){ console.error("Firebase save error:", e); }
     setScreen("numReveal");
   };
 
@@ -484,7 +480,7 @@ export default function App() {
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
     setPayLoading(true);
-    await new Promise(r=>setTimeout(r,300));
+    await new Promise(r=>setTimeout(r,100));
     {
       // Mark as paid (pending admin approval)
       const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
@@ -505,7 +501,7 @@ export default function App() {
       setScreen("waiting");
       // Email notification to admin
       try {
-        fetch("https://api.emailjs.com/api/v1.0/email/send",{
+        await fetch("https://api.emailjs.com/api/v1.0/email/send",{
           method:"POST",headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
             service_id:"service_pcdqu3d",template_id:"template_76xsdxs",
@@ -517,24 +513,7 @@ export default function App() {
             }
           })
         });
-      } catch(e){}
-      // Send email notification to admin
-      try {
-        await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({
-            service_id:"service_pcdqu3d",
-            template_id:"template_76xsdxs",
-            user_id:"Pn3Q2XWWjTs6OYBrr",
-            template_params:{
-              owner_name: user?.name,
-              phone: user?.phone,
-              horse_numbers: paid.map(h=>h.number).join(", "),
-              amount: paid.filter(h=>h.needsPayment).length * 30000
-            }
-          })
-        });
-      } catch(e){ console.log("Email notification failed:", e); }
+      } catch(e){ console.log('Email failed:', e); }
     }
   };
 
