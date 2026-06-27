@@ -358,6 +358,15 @@ export default function App() {
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
       setUser({name:"Админ"}); setRole("admin"); setScreen("admin"); setActiveNav("admin");
+      try {
+        const allH = await getAllHorses();
+        const byAge = {};
+        allH.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+        setAllReg(byAge);
+        setAdminPendingCount(allH.filter(h=>h.paid===true&&h.approved!==true&&h.approved!==1).length);
+        const dl = await getDeadline();
+        if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
+      } catch(e){ console.error("Admin Firebase load:", e); showToast("Firebase алдаа: "+e.message); }
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
