@@ -383,7 +383,7 @@ export default function App() {
         setAdminPendingCount(allH.filter(h=>h.paid&&!h.approved).length);
         const dl = await getDeadline();
         if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
-      } catch(e){ console.error("Firebase load:", e); }
+      } catch(e){ console.error("Firebase load ERROR:", e); showToast("Firebase алдаа: "+e.message); }
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
