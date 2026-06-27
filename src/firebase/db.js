@@ -134,7 +134,7 @@ export async function markHorsesPaid(horseIds) {
  * Get all horses for a user.
  */
 export async function getMyHorses(phone) {
-  const q = query(horsesCol, where("ownerPhone", "==", phone), orderBy("createdAt", "asc"));
+  const q = query(horsesCol, where("ownerPhone", "==", phone));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
@@ -146,7 +146,7 @@ export async function getMyHorses(phone) {
  * Optionally filter by ageGroupId or search string.
  */
 export async function getPaidHorses({ ageGroupId = null, search = "" } = {}) {
-  let q = query(horsesCol, where("paid", "==", true), orderBy("number", "asc"));
+  let q = query(horsesCol, where("paid", "==", true));
   const snap = await getDocs(q);
   let horses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -169,7 +169,7 @@ export async function getPaidHorses({ ageGroupId = null, search = "" } = {}) {
 
 /** Get ALL horses (admin only). */
 export async function getAllHorses() {
-  const q = query(horsesCol, orderBy("number", "asc"));
+  const q = query(horsesCol);
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
