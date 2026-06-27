@@ -5,6 +5,7 @@ import {
   saveDeadline, getDeadline, clearDeadline,
 } from "./firebase/db";
 
+
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "naadam2026";
@@ -1183,9 +1184,15 @@ export default function App() {
                     <span style={{color:"var(--white-dim)"}}>Банк</span>
                     <span style={{fontWeight:700}}>Худалдаа Хөгжлийн Банк</span>
                   </div>
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
                     <span style={{color:"var(--white-dim)"}}>Данс</span>
-                    <span style={{fontWeight:700,fontFamily:"'Cinzel',serif",letterSpacing:"1px"}}>860004000447007682</span>
+                    <span style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                      <span style={{fontWeight:700,fontFamily:"'Cinzel',serif",letterSpacing:"1px"}}>860004000447007682</span>
+                      <button onClick={()=>copyText("860004000447007682","Дансны дугаар")}
+                        style={{background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"6px",padding:"3px 10px",color:"var(--gold)",fontSize:"11px",fontWeight:700,cursor:"pointer",fontFamily:"'Nunito',sans-serif",whiteSpace:"nowrap"}}>
+                        Хуулах
+                      </button>
+                    </span>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
                     <span style={{color:"var(--white-dim)"}}>Дүн</span>
