@@ -1,10 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses,
-  getAllHorses, approveHorse, deleteHorse,
-  saveDeadline, getDeadline, clearDeadline,
-} from "./firebase/db";
-
+import { useState, useRef } from "react";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
@@ -276,30 +270,7 @@ export default function App() {
   // Payment
   const [payLoading, setPayLoading] = useState(false);
   const [waitingApproval, setWaitingApproval] = useState(false);
-  const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
-
-  // Real-time listener — when waiting for approval, poll Firebase every 5 seconds
-  useEffect(()=>{
-    if(!waitingApproval || !user?.phone) return;
-    const interval = setInterval(async()=>{
-      try {
-        const horses = await getMyHorses(user.phone);
-        const allApproved = horses.filter(h=>h.paid).every(h=>h.approved);
-        if(allApproved && horses.filter(h=>h.paid).length > 0){
-          const byAge = {};
-          horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
-          setAllReg(byAge);
-          setWaitingApproval(false);
-          setScreen("success");
-          showToast("Бүртгэл баталгаажлаа! 🎉");
-          clearInterval(interval);
-        }
-      } catch(e){ console.error(e); }
-    }, 5000);
-    setApprovalPollInterval(interval);
-    return ()=>clearInterval(interval);
-  },[waitingApproval, user?.phone]);
 
   // Explainer / Admin UI
   const [expFilter, setExpFilter] = useState("all");
@@ -344,46 +315,32 @@ export default function App() {
     const el_rp = document.getElementById("rp"); const phone = (el_rp?.dataset?.val || el_rp?.value || "").trim();
     if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
     if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
-    try {
-      const fbUser = await loginOrCreateUser({surname, givenName:name, phone});
-      setUser({...fbUser, givenName:name, surname, phone});
-      setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
-      const horses = await getMyHorses(phone);
-      const byAge = {};
-      horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
-      setAllReg(byAge);
-      showToast("Тавтай морилно уу!");
-    } catch(e){ showToast("Алдаа: "+e.message); }
+    setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
+    setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
+    showToast("Тавтай морилно уу!");
   };
   const doLogin = async () => {
     const el_lp = document.getElementById("lp"); const phone = (el_lp?.dataset?.val || el_lp?.value || "").trim();
     if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
+    // Look up user by phone only
     try {
       const fbUser = await loginOrCreateUser({surname:"", givenName:"", phone});
-      if(!fbUser || !fbUser.givenName){ showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү."); return; }
-      setUser({...fbUser, phone});
+      setUser({...fbUser, givenName: fbUser.givenName || fbUser.name || phone, phone});
       setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
       const horses = await getMyHorses(phone);
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
       showToast("Тавтай морилно уу!");
-    } catch(e){ showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй."); }
+    } catch(e) {
+      showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
+    }
   };
   const doAdminLogin = async () => {
     const u = document.getElementById("au")?.value?.trim();
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
       setUser({name:"Админ"}); setRole("admin"); setScreen("admin"); setActiveNav("admin");
-      try {
-        const allH = await getAllHorses();
-        const byAge = {};
-        allH.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
-        setAllReg(byAge);
-        setAdminPendingCount(allH.filter(h=>h.paid&&!h.approved).length);
-        const dl = await getDeadline();
-        if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
-      } catch(e){ console.error("Firebase load ERROR:", e); showToast("Firebase алдаа: "+e.message); }
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
@@ -487,10 +444,6 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
-    try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
-      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
-    } catch(e){ console.error("Firebase save:", e); }
     setScreen("numReveal");
   };
 
@@ -505,7 +458,7 @@ export default function App() {
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
     setPayLoading(true);
-    try {
+    setTimeout(()=>{
       // Mark as paid (pending admin approval)
       const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
       setAllReg(prev=>{
@@ -513,13 +466,11 @@ export default function App() {
         paid.forEach(h=>{if(!n[h.ageGroupId])n[h.ageGroupId]=[];n[h.ageGroupId]=[...n[h.ageGroupId],h];});
         return n;
       });
-      const fbIds = pendingHorses.map(h=>h.fbId).filter(Boolean);
-      if(fbIds.length) await markHorsesPaid(fbIds);
-    } catch(e){ console.error("markPaid:", e); }
-    setPendingHorses([]);
-    setPayLoading(false);
-    setWaitingApproval(true);
-    setScreen("waiting");
+      setPendingHorses([]);
+      setPayLoading(false);
+      setWaitingApproval(true);
+      setScreen("waiting");
+    },800);
   };
 
   // ── EXPORT CSV ──────────────────────────────────────────────────────────────
@@ -590,7 +541,6 @@ export default function App() {
 
   // Admin actions
   const adminApprove=async(h)=>{
-    try { await approveHorse(h.fbId||h.id); } catch(e){ console.error(e); }
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
@@ -605,7 +555,6 @@ export default function App() {
     }
   };
   const adminReject=async(h)=>{
-    try { await deleteHorse(h.fbId||h.id); } catch(e){ console.error(e); }
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].filter(x=>x.id!==h.id);
@@ -1493,7 +1442,7 @@ export default function App() {
                             <div><div className="horse-name">{h.horseName}</div><div className="horse-meta">Эзэн: {h.ownerName} · Уяач: {h.uyaachName||"—"} · Уралдаанч: {h.riderName}</div></div>
                             <div style={{display:"flex",flexDirection:"column",gap:"4px",alignItems:"flex-end",marginLeft:"auto"}}>
                               {h.paid?<span className="status-paid">✓ Төлсөн</span>:<span className="status-pend">⏳ Хүлээгдэж буй</span>}
-                              {h.paid&&h.approved!==true&&<button className="btn-gold" style={{padding:"4px 10px",fontSize:"11px",marginTop:"0",width:"auto"}} onClick={e=>{e.stopPropagation();adminApprove(h);}}>Зөвшөөрөх</button>}
+                              {!h.approved&&h.paid&&<button className="btn-gold" style={{padding:"4px 10px",fontSize:"11px",marginTop:"0",width:"auto"}} onClick={e=>{e.stopPropagation();adminApprove(h);}}>Зөвшөөрөх</button>}
                               {h.approved&&<span style={{fontSize:"11px",color:"var(--green-t)"}}>✓ Зөвшөөрсөн</span>}
                             </div>
                           </div>
@@ -1682,7 +1631,7 @@ export default function App() {
                     ✅ Баталгаажсан
                   </div>
                 )}
-                <button style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",borderRadius:"10px",padding:"12px",color:"rgba(255,255,255,.4)",fontFamily:"'Nunito',sans-serif",fontSize:"13px",cursor:"pointer"}} onClick={()=>setAdminHorse(null)}>Хаах</button>
+                <button className="btn-red" style={{flex:1}} onClick={()=>{adminReject(adminHorse);setAdminHorse(null);}}>✕ Цуцлах</button>
               </div>
             </div>
           </div>
