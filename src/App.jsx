@@ -1,4 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import {
+  loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses,
+  getAllHorses, approveHorse, deleteHorse,
+  saveDeadline, getDeadline, clearDeadline,
+} from "./firebase/db";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
@@ -269,6 +274,7 @@ export default function App() {
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
+  const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
@@ -315,24 +321,35 @@ export default function App() {
     const el_rp = document.getElementById("rp"); const phone = (el_rp?.dataset?.val || el_rp?.value || "").trim();
     if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
     if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
-    setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
-    setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
-    showToast("Тавтай морилно уу!");
-  };
-  const doLogin = async () => {
-    const el_lp = document.getElementById("lp"); const phone = (el_lp?.dataset?.val || el_lp?.value || "").trim();
-    if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
-    // Look up user by phone only
     try {
-      const fbUser = await loginOrCreateUser({surname:"", givenName:"", phone});
-      setUser({...fbUser, givenName: fbUser.givenName || fbUser.name || phone, phone});
+      const fbUser = await loginOrCreateUser({surname, givenName:name, phone});
+      setUser({...fbUser, givenName:name, surname, phone});
       setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
       const horses = await getMyHorses(phone);
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
       showToast("Тавтай морилно уу!");
-    } catch(e) {
+    } catch(e){ showToast("Алдаа: "+e.message); }
+  };
+  const doLogin = async () => {
+    const el_lp = document.getElementById("lp"); const phone = (el_lp?.dataset?.val || el_lp?.value || "").trim();
+    if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
+    try {
+      // Find existing user by phone
+      const fbUser = await loginOrCreateUser({surname:"", givenName:"", phone});
+      if(!fbUser.givenName && !fbUser.surname){
+        showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
+        return;
+      }
+      setUser({...fbUser, givenName: fbUser.givenName || phone, phone});
+      setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
+      const horses = await getMyHorses(phone);
+      const byAge = {};
+      horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+      setAllReg(byAge);
+      showToast("Тавтай морилно уу!");
+    } catch(e){
       showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
     }
   };
@@ -444,6 +461,11 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
+    // Save to Firebase
+    try {
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
+      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
+    } catch(e){ console.error("Firebase save error:", e); }
     setScreen("numReveal");
   };
 
@@ -458,7 +480,8 @@ export default function App() {
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
     setPayLoading(true);
-    setTimeout(()=>{
+    await new Promise(r=>setTimeout(r,300));
+    {
       // Mark as paid (pending admin approval)
       const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
       setAllReg(prev=>{
@@ -466,11 +489,49 @@ export default function App() {
         paid.forEach(h=>{if(!n[h.ageGroupId])n[h.ageGroupId]=[];n[h.ageGroupId]=[...n[h.ageGroupId],h];});
         return n;
       });
+      // Mark paid in Firebase
+      // Mark paid in Firebase
+      try {
+        const fbIds = pendingHorses.map(h=>h.fbId).filter(Boolean);
+        if(fbIds.length) await markHorsesPaid(fbIds);
+      } catch(e){ console.error(e); }
       setPendingHorses([]);
       setPayLoading(false);
       setWaitingApproval(true);
       setScreen("waiting");
-    },800);
+      // Email notification to admin
+      try {
+        fetch("https://api.emailjs.com/api/v1.0/email/send",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            service_id:"service_pcdqu3d",template_id:"template_76xsdxs",
+            user_id:"Pn3Q2XWWjTs6OYBrr",
+            template_params:{
+              owner_name:user?.name,phone:user?.phone,
+              horse_numbers:paid.map(h=>h.number).join(", "),
+              amount:paid.filter(h=>h.needsPayment).length*30000
+            }
+          })
+        });
+      } catch(e){}
+      // Send email notification to admin
+      try {
+        await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            service_id:"service_pcdqu3d",
+            template_id:"template_76xsdxs",
+            user_id:"Pn3Q2XWWjTs6OYBrr",
+            template_params:{
+              owner_name: user?.name,
+              phone: user?.phone,
+              horse_numbers: paid.map(h=>h.number).join(", "),
+              amount: paid.filter(h=>h.needsPayment).length * 30000
+            }
+          })
+        });
+      } catch(e){ console.log("Email notification failed:", e); }
+    }
   };
 
   // ── EXPORT CSV ──────────────────────────────────────────────────────────────
@@ -541,6 +602,7 @@ export default function App() {
 
   // Admin actions
   const adminApprove=async(h)=>{
+    try { await approveHorse(h.fbId||h.id); } catch(e){}
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
@@ -555,6 +617,7 @@ export default function App() {
     }
   };
   const adminReject=async(h)=>{
+    try { await deleteHorse(h.fbId||h.id); } catch(e){}
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].filter(x=>x.id!==h.id);
@@ -977,7 +1040,7 @@ export default function App() {
                 <div className="auth-title">Дугаар олгогдлоо!</div>
                 {!lastPending.needsPayment && (
                   <div className="auth-subtitle">
-                    Ижил дугаарыг ашиглана — нэмэлт төлбөргүй
+                    Өмнө авсан дугаараа хэрэглэнэ — үнэгүй
                   </div>
                 )}
                 <div className="num-circle"><span className="num-big">{lastPending.number}</span><span className="num-lbl">Дугаар</span></div>
@@ -1109,44 +1172,52 @@ export default function App() {
           {/* ══ WAITING FOR APPROVAL ══ */}
           {screen==="waiting" && (
             <div className="auth-screen">
-              <div className="auth-card" style={{maxWidth:"420px",textAlign:"center"}}>
-                <div style={{fontSize:"48px",marginBottom:"16px"}}>⏳</div>
-                <div className="auth-title" style={{marginBottom:"12px"}}>Төлбөр шалгаж байна...</div>
-                <div className="auth-subtitle" style={{marginBottom:"24px",lineHeight:1.7}}>
-                  Таны гүйлгээг баталгаажуулж байна.<br/>
-                  Баталгаажуулах хуудас гарч иртэл түр хүлээнэ үү.
-                </div>
-                {/* Animated dots */}
-                <div style={{display:"flex",justifyContent:"center",gap:"8px",marginBottom:"28px"}}>
-                  {[0,1,2].map(i=>(
-                    <div key={i} style={{
-                      width:"12px",height:"12px",borderRadius:"50%",
-                      background:"var(--gold)",
-                      animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`
-                    }}/>
-                  ))}
-                </div>
-                <style>{`
-                  @keyframes bounce {
-                    0%,80%,100%{transform:scale(0.6);opacity:0.4;}
-                    40%{transform:scale(1);opacity:1;}
-                  }
-                `}</style>
-                {/* Show registered horses */}
-                <div style={{background:"rgba(255,255,255,.06)",borderRadius:"12px",padding:"14px",marginBottom:"16px",textAlign:"left"}}>
-                  <div style={{fontSize:"12px",color:"var(--white-dim)",marginBottom:"8px",fontWeight:600}}>БҮРТГЭСЭН МОРЬД:</div>
-                  {flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>(
-                    <div key={h.id} style={{display:"flex",alignItems:"center",gap:"10px",padding:"6px 0",borderBottom:"1px solid var(--border-white)"}}>
-                      <div style={{width:"32px",height:"32px",borderRadius:"50%",background:"linear-gradient(135deg,var(--gold3),var(--gold))",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontWeight:700,color:"var(--navy2)",fontSize:"13px",flexShrink:0}}>{h.number}</div>
-                      <div>
-                        <div style={{fontWeight:700,fontSize:"13px"}}>{h.horseName}</div>
-                        <div style={{fontSize:"11px",color:"var(--white-dim)"}}>{h.ageGroupName}</div>
+              <div className="auth-card" style={{maxWidth:"440px",textAlign:"center"}}>
+                <div style={{fontSize:"48px",marginBottom:"12px"}}>⏳</div>
+                <div className="auth-title" style={{marginBottom:"8px"}}>Төлбөр хүлээгдэж байна...</div>
+
+                {/* Bank transfer instruction */}
+                <div style={{background:"rgba(232,192,96,.1)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"14px",padding:"16px",marginBottom:"16px",textAlign:"left"}}>
+                  <div style={{fontSize:"12px",color:"var(--gold)",fontWeight:700,marginBottom:"10px",letterSpacing:"1px"}}>ШИЛЖҮҮЛЭХ МЭДЭЭЛЭЛ</div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
+                    <span style={{color:"var(--white-dim)"}}>Банк</span>
+                    <span style={{fontWeight:700}}>Худалдаа Хөгжлийн Банк</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
+                    <span style={{color:"var(--white-dim)"}}>Данс</span>
+                    <span style={{fontWeight:700,fontFamily:"'Cinzel',serif",letterSpacing:"1px"}}>860004000447007682</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
+                    <span style={{color:"var(--white-dim)"}}>Дүн</span>
+                    <span style={{fontWeight:700,color:"var(--gold)",fontSize:"15px"}}>
+                      {(flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone&&h.needsPayment!==false).length*30000).toLocaleString()}₮
+                    </span>
+                  </div>
+                  <div style={{padding:"8px 0 2px",fontSize:"13px"}}>
+                    <div style={{color:"var(--white-dim)",marginBottom:"4px"}}>Гүйлгээний утга</div>
+                    <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                      <div style={{fontFamily:"'Cinzel',serif",fontSize:"18px",fontWeight:700,color:"var(--gold)",letterSpacing:"3px"}}>
+                        {flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join(", ")}
                       </div>
+                      <button onClick={()=>copyText(flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join(", "),"Дугаарууд")}
+                        style={{background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"6px",padding:"3px 10px",color:"var(--gold)",fontSize:"11px",fontWeight:700,cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>
+                        Хуулах
+                      </button>
                     </div>
+                  </div>
+                </div>
+
+                {/* Animated dots */}
+                <div style={{display:"flex",justifyContent:"center",gap:"8px",marginBottom:"14px"}}>
+                  {[0,1,2].map(i=>(
+                    <div key={i} style={{width:"10px",height:"10px",borderRadius:"50%",background:"var(--gold)",animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>
                   ))}
                 </div>
-                <div style={{fontSize:"12px",color:"rgba(255,255,255,.4)",lineHeight:1.6}}>
-                  Гүйлгээний утгад бичсэн дугаараа банкны баримтаас шалгана уу
+                <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.6);opacity:0.4;}40%{transform:scale(1);opacity:1;}}`}</style>
+
+                <div style={{fontSize:"13px",color:"rgba(255,255,255,.5)",lineHeight:1.7,marginBottom:"6px"}}>
+                  Та <strong style={{color:"#ff8a80"}}>15 минутын дотор</strong> шилжүүлэлт хийнэ үү.<br/>
+                  Амжилттай шилжүүлсэн тохиолдолд<br/>танд <strong style={{color:"var(--gold)"}}>Баталгаажуулах хуудас</strong> гарч ирнэ.
                 </div>
               </div>
             </div>
@@ -1378,6 +1449,33 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Pending notification banner */}
+              {adminPendingCount>0 && (
+                <div style={{background:"rgba(192,57,43,.15)",border:"1px solid rgba(192,57,43,.4)",borderRadius:"12px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px"}}>
+                  <span style={{fontSize:"22px"}}>🔔</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,color:"#ff8a80",fontSize:"14px"}}>{adminPendingCount} бүртгэл баталгаажуулах хүлээгдэж байна!</div>
+                    <div style={{fontSize:"12px",color:"rgba(255,255,255,.55)",marginTop:"2px"}}>Банкны апп шалгаад "✓ Зөвшөөрөх" дарна уу</div>
+                  </div>
+                  <button onClick={()=>setAdminTab("horses")} style={{background:"rgba(192,57,43,.3)",border:"1px solid rgba(192,57,43,.5)",borderRadius:"8px",padding:"7px 14px",color:"#ff8a80",fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:"13px",cursor:"pointer",whiteSpace:"nowrap"}}>
+                    Харах →
+                  </button>
+                </div>
+              )}
+
+                            {/* Pending notification banner */}
+              {adminPendingCount>0 && (
+                <div style={{background:"rgba(192,57,43,.15)",border:"1px solid rgba(192,57,43,.4)",borderRadius:"12px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px"}}>
+                  <span style={{fontSize:"22px"}}>🔔</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,color:"#ff8a80",fontSize:"14px"}}>{adminPendingCount} бүртгэл баталгаажуулах хүлээгдэж байна!</div>
+                    <div style={{fontSize:"12px",color:"rgba(255,255,255,.55)",marginTop:"2px"}}>Банкны апп шалгаад "✓ Зөвшөөрөх" дарна уу</div>
+                  </div>
+                  <button onClick={()=>setAdminTab("horses")} style={{background:"rgba(192,57,43,.3)",border:"1px solid rgba(192,57,43,.5)",borderRadius:"8px",padding:"7px 14px",color:"#ff8a80",fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:"13px",cursor:"pointer",whiteSpace:"nowrap"}}>
+                    Харах →
+                  </button>
+                </div>
+              )}
               <div className="admin-tabs">
                 {[["overview","📊 Ерөнхий"],["horses"," Бүртгэлүүд"],["byage","📋 Насны ангилал"],["export","📥 Экспорт"],["settings","⚙️ Тохиргоо"]].map(([k,l])=>(
                   <button key={k} className={`adm-tab ${adminTab===k?"active":""}`} onClick={()=>setAdminTab(k)}>{l}</button>
@@ -1631,7 +1729,7 @@ export default function App() {
                     ✅ Баталгаажсан
                   </div>
                 )}
-                <button className="btn-red" style={{flex:1}} onClick={()=>{adminReject(adminHorse);setAdminHorse(null);}}>✕ Цуцлах</button>
+                <button style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",borderRadius:"10px",padding:"12px",color:"rgba(255,255,255,.4)",fontFamily:"'Nunito',sans-serif",fontSize:"13px",cursor:"pointer"}} onClick={()=>setAdminHorse(null)}>Хаах</button>
               </div>
             </div>
           </div>
