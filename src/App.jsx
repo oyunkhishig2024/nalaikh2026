@@ -276,6 +276,7 @@ export default function App() {
   // Payment
   const [payLoading, setPayLoading] = useState(false);
   const [waitingApproval, setWaitingApproval] = useState(false);
+  const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
   // Real-time listener — when waiting for approval, poll Firebase every 5 seconds
