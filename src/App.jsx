@@ -1,4 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import {
+  loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses,
+  getAllHorses, approveHorse, deleteHorse,
+  saveDeadline, getDeadline, clearDeadline,
+} from "./firebase/db";
+
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
@@ -309,7 +315,7 @@ export default function App() {
   const lastPending = pendingHorses[pendingHorses.length-1];
 
   // ── AUTH HANDLERS ────────────────────────────────────────────────────────
-  const doRegister = () => {
+  const doRegister = async () => {
     const surname = document.getElementById("rs")?.value?.trim();
     const name = document.getElementById("rn")?.value?.trim();
     const el_rp = document.getElementById("rp"); const phone = (el_rp?.dataset?.val || el_rp?.value || "").trim();
@@ -336,7 +342,7 @@ export default function App() {
       showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
     }
   };
-  const doAdminLogin = () => {
+  const doAdminLogin = async () => {
     const u = document.getElementById("au")?.value?.trim();
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
@@ -421,7 +427,7 @@ export default function App() {
     return e;
   };
 
-  const saveHorse=()=>{
+  const saveHorse=async()=>{
     const errs=validateForm(hForm);
     if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");return;}
     setHFormErr({});
@@ -456,7 +462,7 @@ export default function App() {
   };
 
   // Generate a unique transaction reference ID shown to user
-  const doSubmitPayment=()=>{
+  const doSubmitPayment=async()=>{
     setPayLoading(true);
     setTimeout(()=>{
       // Mark as paid (pending admin approval)
@@ -540,7 +546,7 @@ export default function App() {
   };
 
   // Admin actions
-  const adminApprove=(h)=>{
+  const adminApprove=async(h)=>{
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
@@ -554,7 +560,7 @@ export default function App() {
       showToast("Бүртгэл зөвшөөрөгдлөө");
     }
   };
-  const adminReject=(h)=>{
+  const adminReject=async(h)=>{
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].filter(x=>x.id!==h.id);
