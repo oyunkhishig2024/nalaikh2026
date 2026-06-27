@@ -524,7 +524,7 @@ export default function App() {
       fbId = fbHorse.id;
     } catch(e){
       console.error("Firebase save error:", e);
-      showToast("Алдаа гарлаа, дахин оролдоно уу");
+      showToast("Алдаа: " + (e.message||e.code||"Firebase холбогдсонгүй"));
       return;
     }
     if(!realNum){ showToast("Дугаар авахад алдаа гарлаа"); return; }
