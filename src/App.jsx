@@ -1493,7 +1493,7 @@ export default function App() {
                             <div><div className="horse-name">{h.horseName}</div><div className="horse-meta">Эзэн: {h.ownerName} · Уяач: {h.uyaachName||"—"} · Уралдаанч: {h.riderName}</div></div>
                             <div style={{display:"flex",flexDirection:"column",gap:"4px",alignItems:"flex-end",marginLeft:"auto"}}>
                               {h.paid?<span className="status-paid">✓ Төлсөн</span>:<span className="status-pend">⏳ Хүлээгдэж буй</span>}
-                              {!h.approved&&h.paid&&<button className="btn-gold" style={{padding:"4px 10px",fontSize:"11px",marginTop:"0",width:"auto"}} onClick={e=>{e.stopPropagation();adminApprove(h);}}>Зөвшөөрөх</button>}
+                              {h.paid&&h.approved!==true&&<button className="btn-gold" style={{padding:"4px 10px",fontSize:"11px",marginTop:"0",width:"auto"}} onClick={e=>{e.stopPropagation();adminApprove(h);}}>Зөвшөөрөх</button>}
                               {h.approved&&<span style={{fontSize:"11px",color:"var(--green-t)"}}>✓ Зөвшөөрсөн</span>}
                             </div>
                           </div>
