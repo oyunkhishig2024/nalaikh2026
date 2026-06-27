@@ -276,6 +276,27 @@ export default function App() {
   const [payLoading, setPayLoading] = useState(false);
   const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
+
+  // Poll Firebase every 5 seconds when waiting for admin approval
+  useEffect(()=>{
+    if(!waitingApproval || !user?.phone) return;
+    const interval = setInterval(async()=>{
+      try {
+        const horses = await getMyHorses(user.phone);
+        const paidHorses = horses.filter(h=>h.paid===true);
+        if(paidHorses.length>0 && paidHorses.every(h=>h.approved===true)){
+          const byAge={};
+          horses.forEach(h=>{if(!byAge[h.ageGroupId])byAge[h.ageGroupId]=[];byAge[h.ageGroupId].push(h);});
+          setAllReg(byAge);
+          setWaitingApproval(false);
+          setScreen("success");
+          showToast("Бүртгэл баталгаажлаа! 🎉");
+          clearInterval(interval);
+        }
+      } catch(e){ console.error("Polling error:", e); }
+    }, 5000);
+    return ()=>clearInterval(interval);
+  },[waitingApproval, user?.phone]);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
   // Explainer / Admin UI
