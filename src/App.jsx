@@ -321,32 +321,46 @@ export default function App() {
     const el_rp = document.getElementById("rp"); const phone = (el_rp?.dataset?.val || el_rp?.value || "").trim();
     if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
     if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
-    setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
-    setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
-    showToast("Тавтай морилно уу!");
-  };
-  const doLogin = async () => {
-    const el_lp = document.getElementById("lp"); const phone = (el_lp?.dataset?.val || el_lp?.value || "").trim();
-    if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
-    // Look up user by phone only
     try {
-      const fbUser = await loginOrCreateUser({surname:"", givenName:"", phone});
-      setUser({...fbUser, givenName: fbUser.givenName || fbUser.name || phone, phone});
+      const fbUser = await loginOrCreateUser({surname, givenName:name, phone});
+      setUser({...fbUser, givenName:name, surname, phone});
       setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
       const horses = await getMyHorses(phone);
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
       showToast("Тавтай морилно уу!");
-    } catch(e) {
-      showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
-    }
+    } catch(e){ showToast("Алдаа: "+e.message); }
+  };
+  const doLogin = async () => {
+    const el_lp = document.getElementById("lp"); const phone = (el_lp?.dataset?.val || el_lp?.value || "").trim();
+    if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
+    try {
+      const fbUser = await loginOrCreateUser({surname:"", givenName:"", phone});
+      if(!fbUser || !fbUser.givenName){ showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү."); return; }
+      setUser({...fbUser, phone});
+      setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
+      const horses = await getMyHorses(phone);
+      const byAge = {};
+      horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+      setAllReg(byAge);
+      showToast("Тавтай морилно уу!");
+    } catch(e){ showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй."); }
   };
   const doAdminLogin = async () => {
     const u = document.getElementById("au")?.value?.trim();
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
       setUser({name:"Админ"}); setRole("admin"); setScreen("admin"); setActiveNav("admin");
+      try {
+        const allH = await getAllHorses();
+        const byAge = {};
+        allH.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+        setAllReg(byAge);
+        setAdminPendingCount(allH.filter(h=>h.paid&&!h.approved).length);
+        const dl = await getDeadline();
+        if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
+      } catch(e){ console.error("Firebase load:", e); }
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
@@ -450,6 +464,10 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
+    try {
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
+      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
+    } catch(e){ console.error("Firebase save:", e); }
     setScreen("numReveal");
   };
 
@@ -464,7 +482,7 @@ export default function App() {
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
     setPayLoading(true);
-    setTimeout(()=>{
+    try {
       // Mark as paid (pending admin approval)
       const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
       setAllReg(prev=>{
@@ -472,11 +490,13 @@ export default function App() {
         paid.forEach(h=>{if(!n[h.ageGroupId])n[h.ageGroupId]=[];n[h.ageGroupId]=[...n[h.ageGroupId],h];});
         return n;
       });
-      setPendingHorses([]);
-      setPayLoading(false);
-      setWaitingApproval(true);
-      setScreen("waiting");
-    },800);
+      const fbIds = pendingHorses.map(h=>h.fbId).filter(Boolean);
+      if(fbIds.length) await markHorsesPaid(fbIds);
+    } catch(e){ console.error("markPaid:", e); }
+    setPendingHorses([]);
+    setPayLoading(false);
+    setWaitingApproval(true);
+    setScreen("waiting");
   };
 
   // ── EXPORT CSV ──────────────────────────────────────────────────────────────
@@ -547,6 +567,7 @@ export default function App() {
 
   // Admin actions
   const adminApprove=async(h)=>{
+    try { await approveHorse(h.fbId||h.id); } catch(e){ console.error(e); }
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
@@ -561,6 +582,7 @@ export default function App() {
     }
   };
   const adminReject=async(h)=>{
+    try { await deleteHorse(h.fbId||h.id); } catch(e){ console.error(e); }
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].filter(x=>x.id!==h.id);
