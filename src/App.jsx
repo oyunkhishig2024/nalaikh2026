@@ -1,14 +1,9 @@
 import { useState, useRef } from "react";
-import {
-  loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses,
-  getPaidHorses, getAllHorses, approveHorse, deleteHorse,
-  getAdminStats, saveDeadline, getDeadline, clearDeadline,
-} from "./firebase/db";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "naadam2026";
-const EXPLAINER_CODE = "EXPLAINER2026";
+const EXPLAINER_CODE = "tailbar2026";
 
 // Sequential number counter — first paid horse gets #1, next #2, etc.
 let nextHorseNumber = { value: 1 };
@@ -222,8 +217,13 @@ textarea{resize:vertical;min-height:72px;}
 /* MISC */
 .spinner{width:30px;height:30px;border:3px solid var(--border-gold);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy2);padding:11px 22px;border-radius:30px;font-weight:700;font-size:14px;z-index:300;box-shadow:0 6px 28px rgba(232,192,96,.4);animation:toastIn .3s ease;white-space:nowrap;}
+.pass-wrap{position:relative;}
+.pass-wrap input{padding-right:42px;}
+.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.45);font-size:18px;cursor:pointer;padding:0;line-height:1;transition:color .2s;}
+.eye-btn:hover{color:var(--gold);}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy2);padding:12px 20px;border-radius:16px;font-weight:700;font-size:14px;z-index:300;box-shadow:0 6px 28px rgba(232,192,96,.4);animation:toastIn .3s ease;white-space:normal;max-width:calc(100vw - 32px);width:max-content;text-align:center;line-height:1.5;word-break:keep-all;}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(16px);}}
+@media(max-width:480px){.toast{bottom:16px;font-size:13px;padding:10px 16px;border-radius:12px;}}
 .empty-state{text-align:center;padding:56px 20px;color:var(--white-dim);}
 .empty-state .big{font-size:44px;margin-bottom:10px;}
 .info-row{background:rgba(15,33,112,.4);border:1px solid var(--border-gold);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:20px;}
@@ -269,6 +269,8 @@ export default function App() {
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
+  const [waitingApproval, setWaitingApproval] = useState(false);
+  const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
   // Explainer / Admin UI
   const [expFilter, setExpFilter] = useState("all");
@@ -307,27 +309,34 @@ export default function App() {
   const lastPending = pendingHorses[pendingHorses.length-1];
 
   // ── AUTH HANDLERS ────────────────────────────────────────────────────────
-  const doRegister = async () => {
+  const doRegister = () => {
     const surname = document.getElementById("rs")?.value?.trim();
     const name = document.getElementById("rn")?.value?.trim();
-    const phone = document.getElementById("rp")?.value?.trim();
+    const el_rp = document.getElementById("rp"); const phone = (el_rp?.dataset?.val || el_rp?.value || "").trim();
     if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
-    if(!phone||phone.length<8){showToast("Гар утасны дугаар оруулна уу");return;}
+    if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
     setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
     setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
     showToast("Тавтай морилно уу!");
   };
   const doLogin = async () => {
-    const surname = document.getElementById("ls")?.value?.trim();
-    const name = document.getElementById("ln")?.value?.trim();
-    const phone = document.getElementById("lp")?.value?.trim();
-    if(!surname||!name){showToast("Овог нэрээ оруулна уу");return;}
-    if(!phone||phone.length<8){showToast("Гар утасны дугаар оруулна уу");return;}
-    setUser({name:`${surname} ${name}`,surname,givenName:name,phone});
-    setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
-    showToast("Тавтай морилно уу!");
+    const el_lp = document.getElementById("lp"); const phone = (el_lp?.dataset?.val || el_lp?.value || "").trim();
+    if(!phone||phone.replace(/\D/g,"").length!==8){showToast("Гар утасны дугаар 8 оронтой байх ёстой");return;}
+    // Look up user by phone only
+    try {
+      const fbUser = await loginOrCreateUser({surname:"", givenName:"", phone});
+      setUser({...fbUser, givenName: fbUser.givenName || fbUser.name || phone, phone});
+      setRole("user"); setScreen("dashboard"); setActiveNav("dashboard");
+      const horses = await getMyHorses(phone);
+      const byAge = {};
+      horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+      setAllReg(byAge);
+      showToast("Тавтай морилно уу!");
+    } catch(e) {
+      showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
+    }
   };
-  const doAdminLogin = async () => {
+  const doAdminLogin = () => {
     const u = document.getElementById("au")?.value?.trim();
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
@@ -335,7 +344,7 @@ export default function App() {
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
-    const code = document.getElementById("ec")?.value?.trim().toUpperCase();
+    const code = document.getElementById("ec")?.value?.trim();
     if(code===EXPLAINER_CODE){
       setUser({name:"Тайлбарлагч"}); setRole("explainer"); setScreen("explainer"); setActiveNav("explainer");
     } else { showToast("Код буруу байна"); }
@@ -412,7 +421,7 @@ export default function App() {
     return e;
   };
 
-  const saveHorse=async()=>{
+  const saveHorse=()=>{
     const errs=validateForm(hForm);
     if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");return;}
     setHFormErr({});
@@ -447,16 +456,20 @@ export default function App() {
   };
 
   // Generate a unique transaction reference ID shown to user
-  const doSubmitPayment=async()=>{
+  const doSubmitPayment=()=>{
     setPayLoading(true);
     setTimeout(()=>{
-      const paid=pendingHorses.map(h=>({...h,paid:true}));
+      // Mark as paid (pending admin approval)
+      const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
       setAllReg(prev=>{
         const n={...prev};
         paid.forEach(h=>{if(!n[h.ageGroupId])n[h.ageGroupId]=[];n[h.ageGroupId]=[...n[h.ageGroupId],h];});
         return n;
       });
-      setPendingHorses([]);setPayLoading(false);setScreen("success");showToast("Бүртгэл амжилттай!");
+      setPendingHorses([]);
+      setPayLoading(false);
+      setWaitingApproval(true);
+      setScreen("waiting");
     },800);
   };
 
@@ -527,15 +540,21 @@ export default function App() {
   };
 
   // Admin actions
-  const adminApprove=async(h)=>{
+  const adminApprove=(h)=>{
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
       return n;
     });
-    showToast("Бүртгэл зөвшөөрөгдлөө");
+    if(waitingApproval && h.ownerPhone===user?.phone){
+      setWaitingApproval(false);
+      setScreen("success");
+      showToast("Бүртгэл баталгаажлаа! 🎉");
+    } else {
+      showToast("Бүртгэл зөвшөөрөгдлөө");
+    }
   };
-  const adminReject=async(h)=>{
+  const adminReject=(h)=>{
     setAllReg(prev=>{
       const n={...prev};
       n[h.ageGroupId]=n[h.ageGroupId].filter(x=>x.id!==h.id);
@@ -593,12 +612,20 @@ export default function App() {
               </>}
             </nav>
 
-            <button className="user-badge" onClick={logout}>
-              {role==="admin"&&<span className="role-chip role-admin">Админ</span>}
-              {role==="explainer"&&<span className="role-chip role-explainer">Тайлбарлагч</span>}
-              {role==="user"&&<span className="role-chip role-user">Хэрэглэгч</span>}
-              {" "}{user?.givenName||user?.name?.split(" ")[1]||user?.name} ↩
-            </button>
+            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+              <div className="user-badge" style={{cursor:"default"}}>
+                {role==="admin"&&<span className="role-chip role-admin">Админ</span>}
+                {role==="explainer"&&<span className="role-chip role-explainer">Тайлбарлагч</span>}
+                {role==="user"&&<span className="role-chip role-user">Хэрэглэгч</span>}
+                {" "}{user?.givenName||user?.name?.split(" ")[1]||user?.name}
+              </div>
+              <button onClick={logout}
+                style={{background:"rgba(192,57,43,.15)",border:"1px solid rgba(192,57,43,.4)",borderRadius:"20px",padding:"6px 14px",color:"#ff8a80",fontFamily:"'Nunito',sans-serif",fontSize:"13px",fontWeight:700,cursor:"pointer",transition:"all .2s"}}
+                onMouseOver={e=>e.target.style.background="rgba(192,57,43,.3)"}
+                onMouseOut={e=>e.target.style.background="rgba(192,57,43,.15)"}>
+                Гарах
+              </button>
+            </div>
           </header>
         )}
 
@@ -632,7 +659,7 @@ export default function App() {
                       </div>
                     </div>
                     <label>Нэвтрэх код</label>
-                    <input id="ec" type="password" placeholder="••••••••••••" style={{letterSpacing:"4px"}}/>
+                    <EyeInput id="ec" placeholder="Нэвтрэх код"/>
                     <button className="btn-gold" onClick={doExplainerLogin}>Нэвтрэх →</button>
                   </>
                 )}
@@ -650,7 +677,7 @@ export default function App() {
                     <label>Нэвтрэх нэр</label>
                     <input id="au" type="text" placeholder="Нэвтрэх нэр"/>
                     <label>Нууц үг</label>
-                    <input id="ap" type="password" placeholder="••••••••"/>
+                    <EyeInput id="ap" placeholder="Нууц үг"/>
                     <button className="btn-gold" onClick={doAdminLogin} style={{background:"linear-gradient(135deg,#7b1010,var(--red2))"}}>Нэвтрэх →</button>
                   </>
                 )}
@@ -665,7 +692,7 @@ export default function App() {
             <div className="page">
               <div className="banner">
                 <h2>Тавтай морилно уу, {user?.givenName}!</h2>
-                <p>Мориныхоо насны ангиллыг сонгоод бүртгэлийг эхлүүлнэ үү. Бүртгэлийн хураамж морь тутамд 50,000₮ байна.</p>
+                <p>Мориныхоо насны ангиллыг сонгоод бүртгэлийг эхлүүлнэ үү. Бүртгэлийн хураамж морь тутамд 30,000₮ байна.</p>
                 <div className="stats-row">
                   <div className="stat-card"><div className="stat-val">{myHorses.length}</div><div className="stat-label">Нийт морь</div></div>
                   <div className="stat-card"><div className="stat-val">{myHorses.filter(h=>h.paid).length}</div><div className="stat-label">Төлбөр хийсэн</div></div>
@@ -1005,14 +1032,14 @@ export default function App() {
                   <div key={h.id} className="pay-row">
                     <span>#{h.number} {h.horseName} <span className="tag">{h.ageGroupName}</span></span>
                     {h.needsPayment
-                      ? <span style={{color:"var(--gold)"}}>50,000₮</span>
+                      ? <span style={{color:"var(--gold)"}}>30,000₮</span>
                       : <span style={{color:"#2ecc71",fontSize:"12px"}}>✓ Дугаар ашигласан — үнэгүй</span>
                     }
                   </div>
                 ))}
                 <div className="pay-row pay-total">
                   <span>Нийт дүн</span>
-                  <span>{(pendingHorses.filter(h=>h.needsPayment).length*50000).toLocaleString()}₮</span>
+                  <span>{(pendingHorses.filter(h=>h.needsPayment).length*30000).toLocaleString()}₮</span>
                 </div>
                 {pendingHorses.some(h=>!h.needsPayment) && (
                   <div style={{fontSize:"12px",color:"rgba(255,255,255,.5)",marginTop:"8px",padding:"8px 0",borderTop:"1px solid var(--border-white)",lineHeight:1.6}}>
@@ -1045,7 +1072,7 @@ export default function App() {
                 </div>
                 <div className="bank-info-row">
                   <span className="bank-info-label">Шилжүүлэх дүн</span>
-                  <span className="bank-info-val highlight">{(pendingHorses.filter(h=>h.needsPayment).length*50000).toLocaleString()}₮</span>
+                  <span className="bank-info-val highlight">{(pendingHorses.filter(h=>h.needsPayment).length*30000).toLocaleString()}₮</span>
                 </div>
               </div>
 
@@ -1079,73 +1106,142 @@ export default function App() {
           )}
 
           {/* ══ SUCCESS ══ */}
+          {/* ══ WAITING FOR APPROVAL ══ */}
+          {screen==="waiting" && (
+            <div className="auth-screen">
+              <div className="auth-card" style={{maxWidth:"420px",textAlign:"center"}}>
+                <div style={{fontSize:"48px",marginBottom:"16px"}}>⏳</div>
+                <div className="auth-title" style={{marginBottom:"12px"}}>Төлбөр шалгаж байна...</div>
+                <div className="auth-subtitle" style={{marginBottom:"24px",lineHeight:1.7}}>
+                  Таны гүйлгээг баталгаажуулж байна.<br/>
+                  Баталгаажуулах хуудас гарч иртэл түр хүлээнэ үү.
+                </div>
+                {/* Animated dots */}
+                <div style={{display:"flex",justifyContent:"center",gap:"8px",marginBottom:"28px"}}>
+                  {[0,1,2].map(i=>(
+                    <div key={i} style={{
+                      width:"12px",height:"12px",borderRadius:"50%",
+                      background:"var(--gold)",
+                      animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`
+                    }}/>
+                  ))}
+                </div>
+                <style>{`
+                  @keyframes bounce {
+                    0%,80%,100%{transform:scale(0.6);opacity:0.4;}
+                    40%{transform:scale(1);opacity:1;}
+                  }
+                `}</style>
+                {/* Show registered horses */}
+                <div style={{background:"rgba(255,255,255,.06)",borderRadius:"12px",padding:"14px",marginBottom:"16px",textAlign:"left"}}>
+                  <div style={{fontSize:"12px",color:"var(--white-dim)",marginBottom:"8px",fontWeight:600}}>БҮРТГЭСЭН МОРЬД:</div>
+                  {flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>(
+                    <div key={h.id} style={{display:"flex",alignItems:"center",gap:"10px",padding:"6px 0",borderBottom:"1px solid var(--border-white)"}}>
+                      <div style={{width:"32px",height:"32px",borderRadius:"50%",background:"linear-gradient(135deg,var(--gold3),var(--gold))",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontWeight:700,color:"var(--navy2)",fontSize:"13px",flexShrink:0}}>{h.number}</div>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:"13px"}}>{h.horseName}</div>
+                        <div style={{fontSize:"11px",color:"var(--white-dim)"}}>{h.ageGroupName}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{fontSize:"12px",color:"rgba(255,255,255,.4)",lineHeight:1.6}}>
+                  Гүйлгээний утгад бичсэн дугаараа банкны баримтаас шалгана уу
+                </div>
+              </div>
+            </div>
+          )}
+
           {screen==="success" && (
-            <div className="auth-screen" style={{padding:"20px"}}>
-              {/* Printable card */}
+            <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#0a1a5e 0%,#060e3a 60%,#030820 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"20px 16px 40px"}}>
+
+              {/* ── CONFIRMATION CARD ── */}
               <div id="success-card" style={{
-                maxWidth:"480px",width:"100%",margin:"0 auto",
+                maxWidth:"400px",width:"100%",
                 background:"linear-gradient(160deg,#0a1a5e 0%,#0d1c6e 100%)",
-                border:"2px solid #e8c060",borderRadius:"20px",padding:"28px 24px",
+                border:"2px solid #e8c060",borderRadius:"24px",
+                padding:"0 0 20px",overflow:"hidden",
                 fontFamily:"Arial,sans-serif",color:"#fff",
-                boxShadow:"0 0 40px rgba(232,192,96,.2)"
+                boxShadow:"0 8px 40px rgba(0,0,0,.5)"
               }}>
-                {/* Header */}
-                <div style={{textAlign:"center",borderBottom:"1px solid rgba(232,192,96,.3)",paddingBottom:"16px",marginBottom:"16px"}}>
-                  <div style={{fontFamily:"'Cinzel',serif",fontSize:"13px",color:"var(--gold)",letterSpacing:"2px",marginBottom:"4px"}}>
-                    ҮНДЭСНИЙ ИХ БАЯР — НАЛАЙХ ДҮҮРГИЙН НААДАМ
+                {/* Gold header band */}
+                <div style={{background:"linear-gradient(135deg,#b8922a,#e8c060)",padding:"16px 20px",textAlign:"center"}}>
+                  <div style={{fontFamily:"'Cinzel',serif",fontSize:"11px",color:"#0a1a5e",letterSpacing:"2px",marginBottom:"2px",fontWeight:700}}>
+                    НАЛАЙХ ДҮҮРГИЙН НААДАМ 2026
                   </div>
-                  <div style={{fontFamily:"'Cinzel',serif",fontSize:"22px",color:"var(--gold)",marginBottom:"4px"}}>
-                    🏆 Бүртгэл Амжилттай!
+                  <div style={{fontFamily:"'Cinzel',serif",fontSize:"18px",color:"#0a1a5e",fontWeight:700}}>
+                    БҮРТГЭЛ БАТАЛГААЖЛАА ✓
                   </div>
-                  <div style={{fontSize:"13px",color:"rgba(255,255,255,.7)"}}>
-                    Эзэн: {user?.name}
-                  </div>
+                </div>
+
+                {/* Owner info */}
+                <div style={{padding:"14px 20px 0",textAlign:"center"}}>
+                  <div style={{fontSize:"12px",color:"rgba(255,255,255,.5)",marginBottom:"2px"}}>ЭЗЭН</div>
+                  <div style={{fontSize:"16px",fontWeight:700,color:"#fff"}}>{user?.name}</div>
                 </div>
 
                 {/* Horse cards */}
-                {allHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>(
-                  <div key={h.id} style={{marginBottom:"10px"}}>
-                    {/* Horse row */}
-                    <div style={{
-                      background:"rgba(255,255,255,.06)",border:"1px solid rgba(232,192,96,.4)",
-                      borderRadius:"14px",padding:"14px 16px",
-                      display:"flex",alignItems:"center",gap:"14px"
+                <div style={{padding:"12px 16px 0"}}>
+                  {flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map((h,idx)=>(
+                    <div key={h.id} style={{
+                      background:"rgba(255,255,255,.07)",
+                      border:"1px solid rgba(232,192,96,.35)",
+                      borderRadius:"16px",padding:"14px 16px",
+                      marginBottom:"10px"
                     }}>
-                      <div style={{
-                        width:"64px",height:"64px",borderRadius:"50%",flexShrink:0,
-                        background:"linear-gradient(135deg,#b8922a,#e8c060)",
-                        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"
-                      }}>
-                        <span style={{fontFamily:"'Cinzel',serif",fontSize:"22px",fontWeight:700,color:"#0a1a5e",lineHeight:1}}>{h.number}</span>
-                        <span style={{fontSize:"9px",color:"#0a1a5e",fontWeight:700,letterSpacing:"0.5px"}}>ДУГААР</span>
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:700,fontSize:"16px",marginBottom:"3px"}}>{h.horseName}</div>
-                        <div style={{fontSize:"12px",color:"rgba(255,255,255,.65)",lineHeight:1.6}}>
-                          <span style={{background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"4px",padding:"1px 7px",fontSize:"11px",color:"#f5d882",marginRight:"6px"}}>{h.ageGroupName}</span><br/>
-                          Уяач: {h.uyaachName||"—"}<br/>
-                          Уралдаанч: {h.riderName}{h.riderAge?` · ${h.riderAge} нас`:""}
+                      {/* Big number */}
+                      <div style={{display:"flex",alignItems:"center",gap:"14px"}}>
+                        <div style={{
+                          width:"72px",height:"72px",borderRadius:"50%",flexShrink:0,
+                          background:"linear-gradient(135deg,#b8922a,#e8c060)",
+                          display:"flex",flexDirection:"column",
+                          alignItems:"center",justifyContent:"center",
+                          boxShadow:"0 0 20px rgba(232,192,96,.4)"
+                        }}>
+                          <span style={{fontFamily:"'Cinzel',serif",fontSize:h.number>99?"20px":"26px",fontWeight:700,color:"#0a1a5e",lineHeight:1}}>{h.number}</span>
+                          <span style={{fontSize:"8px",color:"#0a1a5e",fontWeight:700,letterSpacing:"1px",marginTop:"2px"}}>ДУГААР</span>
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:700,fontSize:"16px",marginBottom:"4px"}}>{h.horseName}</div>
+                          <div style={{display:"inline-block",background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"6px",padding:"2px 8px",fontSize:"11px",color:"#f5d882",marginBottom:"6px"}}>{h.ageGroupName}</div>
+                          <div style={{fontSize:"12px",color:"rgba(255,255,255,.6)",lineHeight:1.6}}>
+                            Уяач: {h.uyaachName||"—"}<br/>
+                            Уралдаанч: {h.riderName}{h.riderAge?` · ${h.riderAge} нас`:""}
+                          </div>
                         </div>
                       </div>
-                      <div style={{color:"#2ecc71",fontSize:"20px",flexShrink:0}}>✓</div>
+                      {/* Same number reuse note */}
+                      {!h.needsPayment && (
+                        <div style={{marginTop:"8px",fontSize:"11px",color:"#2ecc71",padding:"4px 8px",background:"rgba(39,174,96,.1)",borderRadius:"6px",textAlign:"center"}}>
+                          ✓ Ижил дугаар — нэмэлт төлбөргүй
+                        </div>
+                      )}
                     </div>
+                  ))}
+                </div>
 
+                {/* Important instruction */}
+                <div style={{margin:"4px 16px 0",background:"rgba(232,192,96,.1)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"12px",padding:"12px 14px",textAlign:"center"}}>
+                  <div style={{fontSize:"13px",fontWeight:700,color:"#e8c060",marginBottom:"4px"}}>⚠️ ЧУХАЛ МЭДЭЭЛЭЛ</div>
+                  <div style={{fontSize:"12px",color:"rgba(255,255,255,.75)",lineHeight:1.6}}>
+                    Энэ баримтыг цамц/хантааз авахдаа үзүүлнэ үү.<br/>
+                    Дугаартай цамцаа авахдаа дээрх <strong style={{color:"#e8c060"}}>дугаараа</strong> заана уу.
                   </div>
-                ))}
-
-                {/* Footer */}
-                <div style={{textAlign:"center",marginTop:"16px",paddingTop:"14px",borderTop:"1px solid rgba(232,192,96,.2)",fontSize:"11px",color:"rgba(255,255,255,.45)",lineHeight:1.6}}>
-                  Энэ баримтыг хадгалж, цамц авах үед үзүүлнэ үү. Дугаартай цамцаа авахдаа дээрх дугаараа заана уу.
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div style={{maxWidth:"480px",width:"100%",margin:"14px auto 0",display:"flex",flexDirection:"column",gap:"10px"}}>
-                <button className="btn-gold" style={{marginTop:0,display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}
+              {/* ── SAVE BUTTON ── */}
+              <div style={{maxWidth:"400px",width:"100%",marginTop:"16px",display:"flex",flexDirection:"column",gap:"10px"}}>
+                <button style={{
+                  width:"100%",background:"linear-gradient(135deg,#b8922a,#e8c060)",
+                  border:"none",borderRadius:"14px",padding:"16px",
+                  color:"#0a1a5e",fontFamily:"'Nunito',sans-serif",fontSize:"16px",
+                  fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",
+                  justifyContent:"center",gap:"10px",boxShadow:"0 4px 20px rgba(232,192,96,.3)"
+                }}
                   onClick={async()=>{
                     const el=document.getElementById("success-card");
                     if(!el) return;
-                    // Dynamically load html2canvas
                     if(!window.html2canvas){
                       await new Promise((res,rej)=>{
                         const s=document.createElement("script");
@@ -1155,24 +1251,26 @@ export default function App() {
                       });
                     }
                     try {
-                      const canvas = await window.html2canvas(el, {
-                        backgroundColor:"#0a1a5e",
-                        scale:2,
-                        useCORS:true,
-                        logging:false,
+                      showToast("Зураг хадгалж байна...");
+                      const canvas = await window.html2canvas(el,{
+                        backgroundColor:"#0a1a5e",scale:3,useCORS:true,logging:false
                       });
                       const link=document.createElement("a");
-                      link.download=`дугаар_${allHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join("-")}.png`;
+                      const nums=flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join("-");
+                      link.download=`Налайх_наадам_${nums}.png`;
                       link.href=canvas.toDataURL("image/png");
                       link.click();
-                    } catch(e){
-                      // Fallback to print
-                      window.print();
-                    }
+                      showToast("✓ Галерейд хадгалагдлаа!");
+                    } catch(e){ window.print(); }
                   }}>
-                  📥 Зураг болгон хадгалах
+                  📥 Утасны галерейд хадгалах
                 </button>
-                <button className="btn-ghost" style={{width:"100%"}} onClick={()=>goNav("dashboard","dashboard")}>
+                <button style={{
+                  width:"100%",background:"transparent",
+                  border:"1px solid rgba(255,255,255,.2)",borderRadius:"14px",padding:"13px",
+                  color:"rgba(255,255,255,.6)",fontFamily:"'Nunito',sans-serif",
+                  fontSize:"14px",fontWeight:600,cursor:"pointer"
+                }} onClick={()=>goNav("dashboard","dashboard")}>
                   Нүүр хуудас руу →
                 </button>
               </div>
@@ -1276,7 +1374,7 @@ export default function App() {
                   <div className="stat-card"><div className="stat-val">{flatHorses.length}</div><div className="stat-label">Нийт бүртгэл</div></div>
                   <div className="stat-card"><div className="stat-val">{paidHorses.length}</div><div className="stat-label">Төлбөр хийсэн</div></div>
                   <div className="stat-card"><div className="stat-val">{pendCount}</div><div className="stat-label">Хүлээгдэж буй</div></div>
-                  <div className="stat-card"><div className="stat-val">{(paidHorses.length*50000).toLocaleString()}₮</div><div className="stat-label">Нийт орлого</div></div>
+                  <div className="stat-card"><div className="stat-val">{(paidHorses.length*30000).toLocaleString()}₮</div><div className="stat-label">Нийт орлого</div></div>
                 </div>
               </div>
 
@@ -1412,10 +1510,10 @@ export default function App() {
                 <div className="adm-card">
                   <h3 style={{fontFamily:"'Cinzel',serif",color:"var(--gold)",marginBottom:"14px",paddingBottom:"10px",borderBottom:"1px solid var(--border-gold)"}}>Системийн тохиргоо</h3>
                   {[
-                    ["Тайлбарлагчийн нэвтрэх код","EXPLAINER2026"],
+                    ["Тайлбарлагчийн нэвтрэх код","tailbar2026"],
                     ["Төлбөрийн систем","Банкны шилжүүлэг (ХХБ)"],
                     ["Нийт боломжит дугаар","1 – 1,500"],
-                    ["Бүртгэлийн хураамж","50,000₮ / морь"],
+                    ["Бүртгэлийн хураамж","30,000₮ / морь"],
                     ["Системийн хувилбар","Налайх дүүргийн наадам v1.0"],
                   ].map(([l,v])=>(
                     <div key={l} className="adm-row">
@@ -1488,7 +1586,7 @@ export default function App() {
                   <div>
                     <div style={{fontSize:"11px",color:"var(--white-dim)"}}>Төлбөрийн дүн</div>
                     <div style={{fontFamily:"'Cinzel',serif",fontSize:"18px",color:adminHorse.needsPayment===false?"#2ecc71":"var(--gold)",fontWeight:700}}>
-                      {adminHorse.needsPayment===false ? "Үнэгүй" : "50,000₮"}
+                      {adminHorse.needsPayment===false ? "Үнэгүй" : "30,000₮"}
                     </div>
                   </div>
                   <div>
@@ -1542,6 +1640,29 @@ export default function App() {
         {toast && <div className="toast">{toast}</div>}
       </div>
     </>
+  );
+}
+
+// ── EYE TOGGLE PASSWORD INPUT ───────────────────────────────────────────────
+function EyeInput({id, placeholder, style={}}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="pass-wrap">
+      <input
+        id={id}
+        type={show ? "text" : "password"}
+        placeholder={placeholder}
+        style={{letterSpacing: show ? "normal" : "4px", ...style}}
+      />
+      <button
+        type="button"
+        className="eye-btn"
+        onClick={()=>setShow(s=>!s)}
+        tabIndex={-1}
+      >
+        {show ? "🙈" : "👁"}
+      </button>
+    </div>
   );
 }
 
@@ -1655,14 +1776,9 @@ function UserAuth({doRegister,doLogin}){
         <input id="rp" type="hidden"/>
         <button className="btn-gold" onClick={doRegister}>Нэвтрэх →</button>
       </> : <>
-        <label>Овог:</label>
-        <input type="text" placeholder="Овог" maxLength={40} value={ls}
-          onChange={e=>{const v=filterCyril(e.target.value,setLs);setLs(v);}}/>
-        <input id="ls" type="hidden" value={ls} readOnly/>
-        <label>Нэр:</label>
-        <input type="text" placeholder="Нэр" maxLength={40} value={ln}
-          onChange={e=>{const v=filterCyril(e.target.value,setLn);setLn(v);}}/>
-        <input id="ln" type="hidden" value={ln} readOnly/>
+        <div style={{background:"rgba(232,192,96,.08)",border:"1px solid var(--border-gold)",borderRadius:"10px",padding:"12px 14px",marginBottom:"4px",fontSize:"13px",color:"rgba(255,255,255,.7)",lineHeight:1.6}}>
+          📱 Бүртгүүлэхдээ ашигласан <strong style={{color:"var(--gold)"}}>утасны дугаараа</strong> оруулна уу
+        </div>
         <label>Гар утасны дугаар:</label>
         <PhoneGrid id="lp"/>
         <input id="lp" type="hidden"/>
