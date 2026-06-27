@@ -1682,7 +1682,7 @@ export default function App() {
                     ✅ Баталгаажсан
                   </div>
                 )}
-                <button className="btn-red" style={{flex:1}} onClick={()=>{adminReject(adminHorse);setAdminHorse(null);}}>✕ Цуцлах</button>
+                <button style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",borderRadius:"10px",padding:"12px",color:"rgba(255,255,255,.4)",fontFamily:"'Nunito',sans-serif",fontSize:"13px",cursor:"pointer"}} onClick={()=>setAdminHorse(null)}>Хаах</button>
               </div>
             </div>
           </div>
