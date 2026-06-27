@@ -350,7 +350,20 @@ export default function App() {
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
-      showToast("Тавтай морилно уу!");
+      // Check if user has approved horses → show confirmation card
+      const paidHorses = horses.filter(h=>h.paid===true);
+      const allApproved = paidHorses.length>0 && paidHorses.every(h=>h.approved===true);
+      const hasPending = paidHorses.length>0 && paidHorses.some(h=>h.approved!==true);
+      if(allApproved){
+        setScreen("success");
+        showToast("Таны бүртгэл баталгаажсан байна!");
+      } else if(hasPending){
+        setWaitingApproval(true);
+        setScreen("waiting");
+        showToast("Таны төлбөр шалгагдаж байна...");
+      } else {
+        showToast("Тавтай морилно уу!");
+      }
     } catch(e){ showToast("Алдаа: "+e.message); }
   };
   const doLogin = async () => {
@@ -369,7 +382,20 @@ export default function App() {
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
-      showToast("Тавтай морилно уу!");
+      // Check if user has approved/pending horses
+      const paidHorses = horses.filter(h=>h.paid===true);
+      const allApproved = paidHorses.length>0 && paidHorses.every(h=>h.approved===true);
+      const hasPending = paidHorses.length>0 && paidHorses.some(h=>h.approved!==true);
+      if(allApproved){
+        setScreen("success");
+        showToast("Таны бүртгэл баталгаажсан байна!");
+      } else if(hasPending){
+        setWaitingApproval(true);
+        setScreen("waiting");
+        showToast("Таны төлбөр шалгагдаж байна...");
+      } else {
+        showToast("Тавтай морилно уу!");
+      }
     } catch(e){
       showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
     }
