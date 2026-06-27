@@ -456,8 +456,9 @@ export default function App() {
     const myHorsesInThisAge = myAllHorses.filter(h=>h.ageGroupId===selectedAge.id).length;
     // Reuse number only if: user has a number AND this is first horse in this age group
     const reuseNumber = myFirstNumber && myHorsesInThisAge === 0;
-    // Get atomic number from Firebase FIRST
-    let realNum = reuseNumber ? myFirstNumber : 0;
+    // Get atomic number from Firebase FIRST - show loading
+    showToast("Дугаар авч байна...");
+    let realNum = reuseNumber ? myFirstNumber : null;
     let realNeedsPayment = (reuseNumber === false);
     let fbId = null;
     try {
@@ -465,7 +466,12 @@ export default function App() {
       realNum = fbHorse.number;
       realNeedsPayment = fbHorse.needsPayment;
       fbId = fbHorse.id;
-    } catch(e){ console.error("Firebase save error:", e); }
+    } catch(e){
+      console.error("Firebase save error:", e);
+      showToast("Алдаа гарлаа, дахин оролдоно уу");
+      return;
+    }
+    if(!realNum){ showToast("Дугаар авахад алдаа гарлаа"); return; }
     const horse={...hForm,number:realNum,needsPayment:realNeedsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random(),fbId};
     setPendingHorses(p=>[...p,horse]);
@@ -588,12 +594,13 @@ export default function App() {
 
   // Admin actions
   const adminApprove=async(h)=>{
-    try { await approveHorse(h.fbId||h.id); } catch(e){}
+    try { await approveHorse(h.fbId||h.id); } catch(e){ console.error(e); return; }
     setAllReg(prev=>{
       const n={...prev};
-      n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
+      if(n[h.ageGroupId]) n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
       return n;
     });
+    setAdminPendingCount(prev=>Math.max(0,prev-1));
     if(waitingApproval && h.ownerPhone===user?.phone){
       setWaitingApproval(false);
       setScreen("success");
