@@ -403,7 +403,7 @@ export default function App() {
   const logout=()=>{setRole(null);setUser(null);setScreen("login");setActiveNav("dashboard");};
 
   // ── REGISTRATION FLOW ────────────────────────────────────────────────────
-  const openAge=(ag)=>{setSelectedAge(ag);setHorseCount(1);setCurIdx(0);setHForm({});setScreen("horseForm");};
+  const openAge=(ag)=>{setSelectedAge(ag);setHorseCount(1);setCurIdx(0);if(selectedAge?.id!==ag.id)setHForm({});setScreen("horseForm");};
 
   const setField=(k,v)=>{
     setHForm(f=>({...f,[k]:v}));
@@ -885,7 +885,7 @@ export default function App() {
           {/* ══ HORSE FORM ══ */}
           {screen==="horseForm" && selectedAge && (
             <div className="page-sm">
-              <button className="back-btn" onClick={()=>setScreen("dashboard")}>← Буцах</button>
+              <button className="back-btn" onClick={()=>{setScreen("dashboard");setActiveNav("dashboard");}}>← Буцах</button>
               <div style={{marginBottom:"14px"}}>
                 <div style={{fontFamily:"'Cinzel',serif",color:"var(--gold)",fontSize:"16px",marginBottom:"3px"}}>{selectedAge.name} — {curIdx+1}-р морь</div>
                 <div style={{color:"var(--white-dim)",fontSize:"13px"}}>{selectedAge?.name} ангилал — морины мэдээлэл</div>
