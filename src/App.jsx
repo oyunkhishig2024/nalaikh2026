@@ -278,6 +278,28 @@ export default function App() {
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
+  // Real-time listener — when waiting for approval, poll Firebase every 5 seconds
+  useEffect(()=>{
+    if(!waitingApproval || !user?.phone) return;
+    const interval = setInterval(async()=>{
+      try {
+        const horses = await getMyHorses(user.phone);
+        const allApproved = horses.filter(h=>h.paid).every(h=>h.approved);
+        if(allApproved && horses.filter(h=>h.paid).length > 0){
+          const byAge = {};
+          horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+          setAllReg(byAge);
+          setWaitingApproval(false);
+          setScreen("success");
+          showToast("Бүртгэл баталгаажлаа! 🎉");
+          clearInterval(interval);
+        }
+      } catch(e){ console.error(e); }
+    }, 5000);
+    setApprovalPollInterval(interval);
+    return ()=>clearInterval(interval);
+  },[waitingApproval, user?.phone]);
+
   // Explainer / Admin UI
   const [expFilter, setExpFilter] = useState("all");
   const [expSearch, setExpSearch] = useState("");
