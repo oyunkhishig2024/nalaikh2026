@@ -487,20 +487,29 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
-    // Save to Firebase - get atomic number
+    // Save to Firebase - strip large images to avoid size limit
     showToast("Дугаар авч байна...");
     try {
-      const fbHorse = await registerHorse(user?.id||user?.phone, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
-      // Update with real Firebase number
+      const formDataForFirebase = {...hForm};
+      // Remove large image fields - store only metadata
+      if(formDataForFirebase.horseImage) {
+        formDataForFirebase.horseImageThumb = formDataForFirebase.horseImage.substring(0,100);
+        delete formDataForFirebase.horseImage;
+      }
+      if(formDataForFirebase.riderConsent) {
+        formDataForFirebase.riderConsentUploaded = true;
+        delete formDataForFirebase.riderConsent;
+      }
+      const fbHorse = await registerHorse(user?.id||user?.phone, user?.phone, selectedAge.id, selectedAge.name, {...formDataForFirebase,number:num,needsPayment});
       const realNum = fbHorse.number || num;
       const updatedHorse = {...horse, number:realNum, fbId:fbHorse.id};
       setPendingHorses(p=>p.map(h=>h.id===horse.id ? updatedHorse : h));
-      // Update the displayed horse with real number
       horse.number = realNum;
       horse.fbId = fbHorse.id;
     } catch(e){
       console.error("Firebase save error:", e);
-      showToast("Firebase алдаа: "+(e.message||e.code||JSON.stringify(e)));
+      showToast("Алдаа: "+(e.message||e.code||"Firebase холбогдсонгүй"));
+      return;
     }
     setScreen("numReveal");
   };
