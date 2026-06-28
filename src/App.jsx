@@ -487,11 +487,21 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
-    // Save to Firebase
+    // Save to Firebase - get atomic number
+    showToast("Дугаар авч байна...");
     try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
-      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
-    } catch(e){ console.error("Firebase save error:", e); }
+      const fbHorse = await registerHorse(user?.id||user?.phone, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
+      // Update with real Firebase number
+      const realNum = fbHorse.number || num;
+      const updatedHorse = {...horse, number:realNum, fbId:fbHorse.id};
+      setPendingHorses(p=>p.map(h=>h.id===horse.id ? updatedHorse : h));
+      // Update the displayed horse with real number
+      horse.number = realNum;
+      horse.fbId = fbHorse.id;
+    } catch(e){
+      console.error("Firebase save error:", e);
+      showToast("Firebase алдаа: "+(e.message||e.code||JSON.stringify(e)));
+    }
     setScreen("numReveal");
   };
 
