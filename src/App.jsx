@@ -270,6 +270,7 @@ export default function App() {
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
 
@@ -465,8 +466,10 @@ export default function App() {
   };
 
   const saveHorse=async()=>{
+    if(isSaving) return; // Prevent double click
+    setIsSaving(true);
     const errs=validateForm(hForm);
-    if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");return;}
+    if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");setIsSaving(false);return;}
     setHFormErr({});
     // Number sharing logic:
     // - User's FIRST horse ever → new number, pay
@@ -511,6 +514,7 @@ export default function App() {
       showToast("Алдаа: "+(e.message||e.code||"Firebase холбогдсонгүй"));
       return;
     }
+    setIsSaving(false);
     setScreen("numReveal");
   };
 
@@ -524,6 +528,7 @@ export default function App() {
 
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
+    if(payLoading) return; // Prevent double submit
     setPayLoading(true);
     await new Promise(r=>setTimeout(r,300));
     {
@@ -1193,7 +1198,7 @@ export default function App() {
               {payLoading ? (
                 <div style={{textAlign:"center",padding:"20px"}}><div className="spinner"/><div style={{color:"var(--gold2)",fontSize:"13px"}}>Хүсэлт илгээж байна...</div></div>
               ) : (
-                <button className="btn-gold" onClick={doSubmitPayment}>Бүртгэл илгээх ✓</button>
+                <button className="btn-gold" onClick={doSubmitPayment} disabled={payLoading}>Бүртгэл илгээх ✓</button>
               )}
             </div>
           )}
