@@ -1400,7 +1400,7 @@ export default function App() {
                       },"image/png");
                     } catch(e){ window.print(); }
                   }}>
-                  📥 Утасны галерейд хадгалах
+                  📥 Хадгалах
                 </button>
                 <button style={{
                   width:"100%",background:"transparent",
