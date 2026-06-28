@@ -1,9 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import {
-  loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses,
-  getAllHorses, approveHorse, deleteHorse,
-  saveDeadline, getDeadline, clearDeadline,
-} from "./firebase/db";
+import { loginOrCreateUser, registerHorse, markHorsesPaid, getMyHorses, getAllHorses, approveHorse, deleteHorse, saveDeadline, getDeadline, clearDeadline } from "./firebase/db";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const ADMIN_USER = "admin";
@@ -350,20 +346,7 @@ export default function App() {
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
-      // Check if user has approved horses → show confirmation card
-      const paidHorses = horses.filter(h=>h.paid===true);
-      const allApproved = paidHorses.length>0 && paidHorses.every(h=>h.approved===true);
-      const hasPending = paidHorses.length>0 && paidHorses.some(h=>h.approved!==true);
-      if(allApproved){
-        setScreen("success");
-        showToast("Таны бүртгэл баталгаажсан байна!");
-      } else if(hasPending){
-        setWaitingApproval(true);
-        setScreen("waiting");
-        showToast("Таны төлбөр шалгагдаж байна...");
-      } else {
-        showToast("Тавтай морилно уу!");
-      }
+      showToast("Тавтай морилно уу!");
     } catch(e){ showToast("Алдаа: "+e.message); }
   };
   const doLogin = async () => {
@@ -382,20 +365,7 @@ export default function App() {
       const byAge = {};
       horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
       setAllReg(byAge);
-      // Check if user has approved/pending horses
-      const paidHorses = horses.filter(h=>h.paid===true);
-      const allApproved = paidHorses.length>0 && paidHorses.every(h=>h.approved===true);
-      const hasPending = paidHorses.length>0 && paidHorses.some(h=>h.approved!==true);
-      if(allApproved){
-        setScreen("success");
-        showToast("Таны бүртгэл баталгаажсан байна!");
-      } else if(hasPending){
-        setWaitingApproval(true);
-        setScreen("waiting");
-        showToast("Таны төлбөр шалгагдаж байна...");
-      } else {
-        showToast("Тавтай морилно уу!");
-      }
+      showToast("Тавтай морилно уу!");
     } catch(e){
       showToast("Ийм утасны дугаартай хэрэглэгч олдсонгүй. Дугаараа зөв бичсэн эсэхээ шалгана уу, эсвэл бүртгүүлнэ үү.");
     }
@@ -429,7 +399,7 @@ export default function App() {
   const logout=()=>{setRole(null);setUser(null);setScreen("login");setActiveNav("dashboard");};
 
   // ── REGISTRATION FLOW ────────────────────────────────────────────────────
-  const openAge=(ag)=>{setSelectedAge(ag);setHorseCount(1);setCurIdx(0);if(selectedAge?.id!==ag.id)setHForm({});setScreen("horseForm");};
+  const openAge=(ag)=>{setSelectedAge(ag);setHorseCount(1);setCurIdx(0);setHForm({});setScreen("horseForm");};
 
   const setField=(k,v)=>{
     setHForm(f=>({...f,[k]:v}));
@@ -512,25 +482,16 @@ export default function App() {
     const myHorsesInThisAge = myAllHorses.filter(h=>h.ageGroupId===selectedAge.id).length;
     // Reuse number only if: user has a number AND this is first horse in this age group
     const reuseNumber = myFirstNumber && myHorsesInThisAge === 0;
-    // Get atomic number from Firebase FIRST - show loading
-    showToast("Дугаар авч байна...");
-    let realNum = reuseNumber ? myFirstNumber : null;
-    let realNeedsPayment = (reuseNumber === false);
-    let fbId = null;
-    try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm, number:0, needsPayment:realNeedsPayment});
-      realNum = fbHorse.number;
-      realNeedsPayment = fbHorse.needsPayment;
-      fbId = fbHorse.id;
-    } catch(e){
-      console.error("Firebase save error:", e);
-      showToast("Алдаа: " + (e.message||e.code||"Firebase холбогдсонгүй"));
-      return;
-    }
-    if(!realNum){ showToast("Дугаар авахад алдаа гарлаа"); return; }
-    const horse={...hForm,number:realNum,needsPayment:realNeedsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
-      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random(),fbId};
+    const num = reuseNumber ? myFirstNumber : getNextNumber();
+    const needsPayment = !reuseNumber; // free only when reusing number in new age group
+    const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
+      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
+    // Save to Firebase
+    try {
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
+      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
+    } catch(e){ console.error("Firebase save error:", e); }
     setScreen("numReveal");
   };
 
@@ -545,7 +506,7 @@ export default function App() {
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
     setPayLoading(true);
-    await new Promise(r=>setTimeout(r,100));
+    await new Promise(r=>setTimeout(r,300));
     {
       // Mark as paid (pending admin approval)
       const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
@@ -566,7 +527,7 @@ export default function App() {
       setScreen("waiting");
       // Email notification to admin
       try {
-        await fetch("https://api.emailjs.com/api/v1.0/email/send",{
+        fetch("https://api.emailjs.com/api/v1.0/email/send",{
           method:"POST",headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
             service_id:"service_pcdqu3d",template_id:"template_76xsdxs",
@@ -578,7 +539,24 @@ export default function App() {
             }
           })
         });
-      } catch(e){ console.log('Email failed:', e); }
+      } catch(e){}
+      // Send email notification to admin
+      try {
+        await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            service_id:"service_pcdqu3d",
+            template_id:"template_76xsdxs",
+            user_id:"Pn3Q2XWWjTs6OYBrr",
+            template_params:{
+              owner_name: user?.name,
+              phone: user?.phone,
+              horse_numbers: paid.map(h=>h.number).join(", "),
+              amount: paid.filter(h=>h.needsPayment).length * 30000
+            }
+          })
+        });
+      } catch(e){ console.log("Email notification failed:", e); }
     }
   };
 
@@ -650,13 +628,12 @@ export default function App() {
 
   // Admin actions
   const adminApprove=async(h)=>{
-    try { await approveHorse(h.fbId||h.id); } catch(e){ console.error(e); return; }
+    try { await approveHorse(h.fbId||h.id); } catch(e){}
     setAllReg(prev=>{
       const n={...prev};
-      if(n[h.ageGroupId]) n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
+      n[h.ageGroupId]=n[h.ageGroupId].map(x=>x.id===h.id?{...x,approved:true}:x);
       return n;
     });
-    setAdminPendingCount(prev=>Math.max(0,prev-1));
     if(waitingApproval && h.ownerPhone===user?.phone){
       setWaitingApproval(false);
       setScreen("success");
@@ -911,7 +888,7 @@ export default function App() {
           {/* ══ HORSE FORM ══ */}
           {screen==="horseForm" && selectedAge && (
             <div className="page-sm">
-              <button className="back-btn" onClick={()=>{setScreen("dashboard");setActiveNav("dashboard");}}>← Буцах</button>
+              <button className="back-btn" onClick={()=>setScreen("dashboard")}>← Буцах</button>
               <div style={{marginBottom:"14px"}}>
                 <div style={{fontFamily:"'Cinzel',serif",color:"var(--gold)",fontSize:"16px",marginBottom:"3px"}}>{selectedAge.name} — {curIdx+1}-р морь</div>
                 <div style={{color:"var(--white-dim)",fontSize:"13px"}}>{selectedAge?.name} ангилал — морины мэдээлэл</div>
@@ -1377,16 +1354,41 @@ export default function App() {
                       });
                     }
                     try {
-                      showToast("Зураг хадгалж байна...");
+                      showToast("Зураг бэлдэж байна...");
                       const canvas = await window.html2canvas(el,{
                         backgroundColor:"#0a1a5e",scale:3,useCORS:true,logging:false
                       });
-                      const link=document.createElement("a");
                       const nums=flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join("-");
-                      link.download=`Налайх_наадам_${nums}.png`;
-                      link.href=canvas.toDataURL("image/png");
-                      link.click();
-                      showToast("✓ Галерейд хадгалагдлаа!");
+                      const fileName=`Налайх_наадам_${nums}.png`;
+                      canvas.toBlob(async(blob)=>{
+                        // Try Web Share API first (iOS/Android галерей)
+                        if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],"img.png",{type:"image/png"})]})){
+                          try {
+                            await navigator.share({
+                              title:"Налайх дүүргийн наадам 2026",
+                              text:"Бүртгэл баталгаажлаа! Дугаар: "+nums,
+                              files:[new File([blob],fileName,{type:"image/png"})]
+                            });
+                            showToast("✓ Хадгалагдлаа!");
+                          } catch(e){
+                            if(e.name!=="AbortError") {
+                              // Fallback to download
+                              const url=URL.createObjectURL(blob);
+                              const a=document.createElement("a");
+                              a.href=url; a.download=fileName; a.click();
+                              URL.revokeObjectURL(url);
+                              showToast("✓ Татаж авлаа!");
+                            }
+                          }
+                        } else {
+                          // Desktop fallback - download
+                          const url=URL.createObjectURL(blob);
+                          const a=document.createElement("a");
+                          a.href=url; a.download=fileName; a.click();
+                          URL.revokeObjectURL(url);
+                          showToast("✓ Татаж авлаа!");
+                        }
+                      },"image/png");
                     } catch(e){ window.print(); }
                   }}>
                   📥 Утасны галерейд хадгалах
