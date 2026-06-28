@@ -535,21 +535,6 @@ export default function App() {
       setPayLoading(false);
       setWaitingApproval(true);
       setScreen("waiting");
-      // Email notification to admin
-      try {
-        fetch("https://api.emailjs.com/api/v1.0/email/send",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            service_id:"service_pcdqu3d",template_id:"template_76xsdxs",
-            user_id:"Pn3Q2XWWjTs6OYBrr",
-            template_params:{
-              owner_name:user?.name,phone:user?.phone,
-              horse_numbers:paid.map(h=>h.number).join(", "),
-              amount:paid.filter(h=>h.needsPayment).length*30000
-            }
-          })
-        });
-      } catch(e){}
       // Send email notification to admin
       try {
         await fetch("https://api.emailjs.com/api/v1.0/email/send", {
