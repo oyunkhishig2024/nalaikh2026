@@ -271,29 +271,9 @@ export default function App() {
   // Payment
   const [payLoading, setPayLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
   const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
-
-  // Poll Firebase every 5 seconds when waiting for admin approval
-  useEffect(()=>{
-    if(!waitingApproval || !user?.phone) return;
-    const interval = setInterval(async()=>{
-      try {
-        const horses = await getMyHorses(user.phone);
-        const paidHorses = horses.filter(h=>h.paid===true);
-        if(paidHorses.length>0 && paidHorses.every(h=>h.approved===true)){
-          const byAge={};
-          horses.forEach(h=>{if(!byAge[h.ageGroupId])byAge[h.ageGroupId]=[];byAge[h.ageGroupId].push(h);});
-          setAllReg(byAge);
-          setWaitingApproval(false);
-          setScreen("success");
-          showToast("Бүртгэл баталгаажлаа! 🎉");
-          clearInterval(interval);
-        }
-      } catch(e){ console.error("Polling error:", e); }
-    }, 5000);
-    return ()=>clearInterval(interval);
-  },[waitingApproval, user?.phone]);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
   // Explainer / Admin UI
@@ -376,15 +356,6 @@ export default function App() {
     const p = document.getElementById("ap")?.value?.trim();
     if(u===ADMIN_USER && p===ADMIN_PASS){
       setUser({name:"Админ"}); setRole("admin"); setScreen("admin"); setActiveNav("admin");
-      try {
-        const allH = await getAllHorses();
-        const byAge = {};
-        allH.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
-        setAllReg(byAge);
-        setAdminPendingCount(allH.filter(h=>h.paid===true&&h.approved!==true&&h.approved!==1).length);
-        const dl = await getDeadline();
-        if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
-      } catch(e){ console.error("Admin Firebase load:", e); showToast("Firebase алдаа: "+e.message); }
     } else { showToast("Нэвтрэх нэр эсвэл нууц үг буруу байна"); }
   };
   const doExplainerLogin = () => {
@@ -490,30 +461,12 @@ export default function App() {
     const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
       ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
     setPendingHorses(p=>[...p,horse]);
-    // Save to Firebase - strip large images to avoid size limit
-    showToast("Дугаар авч байна...");
+    // Save to Firebase
     try {
-      const formDataForFirebase = {...hForm};
-      // Remove large image fields - store only metadata
-      if(formDataForFirebase.horseImage) {
-        formDataForFirebase.horseImageThumb = formDataForFirebase.horseImage.substring(0,100);
-        delete formDataForFirebase.horseImage;
-      }
-      if(formDataForFirebase.riderConsent) {
-        formDataForFirebase.riderConsentUploaded = true;
-        delete formDataForFirebase.riderConsent;
-      }
-      const fbHorse = await registerHorse(user?.id||user?.phone, user?.phone, selectedAge.id, selectedAge.name, {...formDataForFirebase,number:num,needsPayment});
-      const realNum = fbHorse.number || num;
-      const updatedHorse = {...horse, number:realNum, fbId:fbHorse.id};
-      setPendingHorses(p=>p.map(h=>h.id===horse.id ? updatedHorse : h));
-      horse.number = realNum;
-      horse.fbId = fbHorse.id;
-    } catch(e){
-      console.error("Firebase save error:", e);
-      showToast("Алдаа: "+(e.message||e.code||"Firebase холбогдсонгүй"));
-      return;
-    }
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
+      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
+    } catch(e){ console.error("Firebase save error:", e); }
+    setIsSaving(false);
     setIsSaving(false);
     setScreen("numReveal");
   };
@@ -528,7 +481,6 @@ export default function App() {
 
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
-    if(payLoading) return; // Prevent double submit
     setPayLoading(true);
     await new Promise(r=>setTimeout(r,300));
     {
@@ -549,6 +501,21 @@ export default function App() {
       setPayLoading(false);
       setWaitingApproval(true);
       setScreen("waiting");
+      // Email notification to admin
+      try {
+        fetch("https://api.emailjs.com/api/v1.0/email/send",{
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            service_id:"service_pcdqu3d",template_id:"template_76xsdxs",
+            user_id:"Pn3Q2XWWjTs6OYBrr",
+            template_params:{
+              owner_name:user?.name,phone:user?.phone,
+              horse_numbers:paid.map(h=>h.number).join(", "),
+              amount:paid.filter(h=>h.needsPayment).length*30000
+            }
+          })
+        });
+      } catch(e){}
       // Send email notification to admin
       try {
         await fetch("https://api.emailjs.com/api/v1.0/email/send", {
@@ -573,7 +540,7 @@ export default function App() {
   const exportCSV = () => {
     const headers = [
       "Дугаар","Морины нэр","Зүс","Насны ангилал",
-      "Эзний нэр","Эзний цол","Эзний регистр",
+      "Эзний нэр","Эзний цол","Эзний харъяалал",
       "Уяачийн нэр","Уяачийн цол",
       "Уралдаанч","Уралдаанчийн хүйс","Уралдаанчийн нас","Уралдаанчийн регистр",
       "Даатгалын дугаар","Өмнөх амжилт",
@@ -582,7 +549,7 @@ export default function App() {
     const rows = flatHorses.map(h=>[
       h.number, h.horseName, h.horseColor||"",
       h.ageGroupName,
-      h.ownerName, h.ownerTitle||"", h.ownerReg||"",
+      h.ownerName, h.ownerTitle||"", h.ownerRegion||"",
       h.uyaachName||"", h.uyaachTitle||"",
       h.riderName, h.riderGender||"", h.riderAge||"", h.riderReg||"",
       h.insurance||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," "),
@@ -950,8 +917,8 @@ export default function App() {
                     <input type="text" placeholder="" value={hForm.ownerTitle||""} onChange={e=>setField("ownerTitle",cyrilOnly(e.target.value))}/>
                   </div>
                   <div>
-                    <label>Регистрийн дугаар</label>
-                    <input type="text" placeholder="АА12345678" value={hForm.ownerReg||""} onChange={e=>setField("ownerReg",e.target.value)}/>
+                    <label>Морины эзний харъяалал</label>
+                    <input type="text" placeholder="Аймаг, сум" value={hForm.ownerRegion||""} onChange={e=>setField("ownerRegion",cyrilOnly(e.target.value))}/>
                   </div>
                 </div>
               </div>
