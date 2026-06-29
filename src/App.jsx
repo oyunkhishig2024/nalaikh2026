@@ -270,8 +270,6 @@ export default function App() {
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  
   const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
@@ -437,10 +435,8 @@ export default function App() {
   };
 
   const saveHorse=async()=>{
-    if(isSaving) return; // Prevent double click
-    setIsSaving(true);
     const errs=validateForm(hForm);
-    if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");setIsSaving(false);return;}
+    if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");return;}
     setHFormErr({});
     // Number sharing logic:
     // - User's FIRST horse ever → new number, pay
@@ -466,8 +462,6 @@ export default function App() {
       const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
       setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
     } catch(e){ console.error("Firebase save error:", e); }
-    setIsSaving(false);
-    setIsSaving(false);
     setScreen("numReveal");
   };
 
@@ -931,6 +925,8 @@ export default function App() {
                 {hFormErr.uyaachName&&<p className="err-msg">⚠ {hFormErr.uyaachName}</p>}
                 <label>Цол / Зэрэг</label>
                 <input type="text" placeholder="" value={hForm.uyaachTitle||""} onChange={e=>setField("uyaachTitle",cyrilOnly(e.target.value))}/>
+                <label>Уяачийн харъяалал</label>
+                <input type="text" placeholder="Уяачийн аймаг, сум" value={hForm.uyaachRegion||""} onChange={e=>setField("uyaachRegion",cyrilOnly(e.target.value))}/>
                 <label>Уралдаанч хүүхдийн овог нэр *</label>
                 <input type="text" placeholder="Бүтэн нэр" value={hForm.riderName||""} onChange={e=>setField("riderName",cyrilOnly(e.target.value))}/>
                 {hFormErr.riderName&&<p className="err-msg">⚠ {hFormErr.riderName}</p>}
@@ -1165,7 +1161,7 @@ export default function App() {
               {payLoading ? (
                 <div style={{textAlign:"center",padding:"20px"}}><div className="spinner"/><div style={{color:"var(--gold2)",fontSize:"13px"}}>Хүсэлт илгээж байна...</div></div>
               ) : (
-                <button className="btn-gold" onClick={doSubmitPayment} disabled={payLoading}>Бүртгэл илгээх ✓</button>
+                <button className="btn-gold" onClick={doSubmitPayment}>Бүртгэл илгээх ✓</button>
               )}
             </div>
           )}
