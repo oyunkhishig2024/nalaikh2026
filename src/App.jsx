@@ -1060,7 +1060,26 @@ export default function App() {
                       setField("riderConsentName",f.name);
                       if(f.type.startsWith("image/")){
                         const r=new FileReader();
-                        r.onload=ev=>setField("riderConsent",ev.target.result);
+                        r.onload=ev=>{
+                          const img=new Image();
+                          img.onload=()=>{
+                            const canvas=document.createElement("canvas");
+                            const MAX=600;
+                            let w=img.width, h=img.height;
+                            if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
+                            else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+                            canvas.width=w; canvas.height=h;
+                            canvas.getContext("2d").drawImage(img,0,0,w,h);
+                            let quality=0.5;
+                            let result=canvas.toDataURL("image/jpeg",quality);
+                            while(result.length>700000 && quality>0.1){
+                              quality-=0.1;
+                              result=canvas.toDataURL("image/jpeg",quality);
+                            }
+                            setField("riderConsent",result);
+                          };
+                          img.src=ev.target.result;
+                        };
                         r.readAsDataURL(f);
                       } else { setField("riderConsent","pdf:"+f.name); }
                     }
