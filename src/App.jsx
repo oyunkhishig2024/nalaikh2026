@@ -241,10 +241,17 @@ textarea{resize:vertical;min-height:72px;}
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  // Auth state
-  const [role, setRole] = useState(null);        // null | "user" | "admin" | "explainer"
+  // Auth state — persisted to localStorage so refresh doesn't log out
+  const [role, setRole] = useState(()=>{
+    try { return localStorage.getItem("naadam_role") || null; } catch(e){ return null; }
+  });
   const [authTab, setAuthTab] = useState("user"); // user | admin | explainer
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(()=>{
+    try {
+      const saved = localStorage.getItem("naadam_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch(e){ return null; }
+  });
 
   // Registration deadline — admin sets this, stored in localStorage
   const [regDeadline, setRegDeadline] = useState(()=>{
@@ -253,9 +260,24 @@ export default function App() {
   });
   const isRegClosed = regDeadline && new Date() > new Date(regDeadline);
 
-  // Navigation
-  const [screen, setScreen] = useState("login"); // login|otp|dashboard|ageGroup|horseForm|numReveal|payment|success|explainer|admin
+  // Navigation — also persist screen/role so refresh stays on dashboard, not login
+  const [screen, setScreen] = useState(()=>{
+    try {
+      const savedRole = localStorage.getItem("naadam_role");
+      const savedUser = localStorage.getItem("naadam_user");
+      if(savedRole && savedUser) return "dashboard";
+    } catch(e){}
+    return "login";
+  });
   const [activeNav, setActiveNav] = useState("dashboard");
+
+  // Persist role/user to localStorage whenever they change
+  useEffect(()=>{
+    try {
+      if(role) localStorage.setItem("naadam_role", role); else localStorage.removeItem("naadam_role");
+      if(user) localStorage.setItem("naadam_user", JSON.stringify(user)); else localStorage.removeItem("naadam_user");
+    } catch(e){}
+  },[role,user]);
 
   // Horse registration state
   const [selectedAge, setSelectedAge] = useState(null);
@@ -267,6 +289,39 @@ export default function App() {
 
   // Global horse store (simulates DB)
   const [allReg, setAllReg] = useState({}); // { ageGroupId: [horse,...] }
+
+  // On page load/refresh, if a user session was restored, reload their data from Firebase
+  useEffect(()=>{
+    if(!role || !user) return;
+    (async()=>{
+      try {
+        if(role==="user" && user.phone){
+          const horses = await getMyHorses(user.phone);
+          const byAge = {};
+          horses.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+          setAllReg(byAge);
+          const paidHorses = horses.filter(h=>h.paid===true);
+          const allApproved = paidHorses.length>0 && paidHorses.every(h=>h.approved===true);
+          const hasPending = paidHorses.length>0 && paidHorses.some(h=>h.approved!==true);
+          if(allApproved){ setScreen("success"); }
+          else if(hasPending){ setWaitingApproval(true); setScreen("waiting"); }
+          else { setScreen("dashboard"); setActiveNav("dashboard"); }
+        } else if(role==="admin"){
+          const allH = await getAllHorses();
+          const byAge = {};
+          allH.forEach(h=>{ if(!byAge[h.ageGroupId]) byAge[h.ageGroupId]=[]; byAge[h.ageGroupId].push(h); });
+          setAllReg(byAge);
+          setAdminPendingCount(allH.filter(h=>h.paid===true&&h.approved!==true&&h.approved!==1).length);
+          setScreen("admin"); setActiveNav("admin");
+          const dl = await getDeadline();
+          if(dl){ setRegDeadline(dl); localStorage.setItem("naadam_reg_deadline",dl); }
+        } else if(role==="explainer"){
+          setScreen("explainer"); setActiveNav("explainer");
+        }
+      } catch(e){ console.error("Session restore error:", e); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]); // run once on mount only
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
@@ -376,7 +431,10 @@ export default function App() {
     if(otp.join("").length<4){showToast("4 оронтой OTP код оруулна уу");return;}
     setScreen("dashboard"); setActiveNav("dashboard"); showToast("Амжилттай нэвтэрлээ!");
   };
-  const logout=()=>{setRole(null);setUser(null);setScreen("login");setActiveNav("dashboard");};
+  const logout=()=>{
+    setRole(null);setUser(null);setScreen("login");setActiveNav("dashboard");
+    try { localStorage.removeItem("naadam_role"); localStorage.removeItem("naadam_user"); } catch(e){}
+  };
 
   // ── REGISTRATION FLOW ────────────────────────────────────────────────────
   const openAge=(ag)=>{setSelectedAge(ag);setHorseCount(1);setCurIdx(0);setHForm({});setScreen("horseForm");};
