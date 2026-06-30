@@ -270,6 +270,7 @@ export default function App() {
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
@@ -444,8 +445,10 @@ export default function App() {
   };
 
   const saveHorse=async()=>{
+    if(isSaving) return;
+    setIsSaving(true);
     const errs=validateForm(hForm);
-    if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");return;}
+    if(Object.keys(errs).length){setHFormErr(errs);showToast("Заавал талбаруудыг бөглөнө үү");setIsSaving(false);return;}
     setHFormErr({});
     // Number sharing logic:
     // - User's FIRST horse ever → new number, pay
@@ -471,6 +474,7 @@ export default function App() {
       const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
       setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
     } catch(e){ console.error("Firebase save error:", e); }
+    setIsSaving(false);
     setScreen("numReveal");
   };
 
@@ -484,6 +488,7 @@ export default function App() {
 
   // Generate a unique transaction reference ID shown to user
   const doSubmitPayment=async()=>{
+    if(payLoading) return;
     setPayLoading(true);
     await new Promise(r=>setTimeout(r,300));
     {
@@ -504,23 +509,11 @@ export default function App() {
       setPayLoading(false);
       setWaitingApproval(true);
       setScreen("waiting");
-      // Email notification to admin
+      // Email notification to admin with full details
       try {
-        fetch("https://api.emailjs.com/api/v1.0/email/send",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            service_id:"service_pcdqu3d",template_id:"template_76xsdxs",
-            user_id:"Pn3Q2XWWjTs6OYBrr",
-            template_params:{
-              owner_name:user?.name,phone:user?.phone,
-              horse_numbers:paid.map(h=>h.number).join(", "),
-              amount:paid.filter(h=>h.needsPayment).length*30000
-            }
-          })
-        });
-      } catch(e){}
-      // Send email notification to admin
-      try {
+        const horseDetails = paid.map(h=>
+          `Дугаар: ${h.number} | Морь: ${h.horseName} | Ангилал: ${h.ageGroupName} | Зүс: ${h.horseColor||"—"} | Эзэн: ${h.ownerName} (${h.ownerRegion||"—"}) | Уяач: ${h.uyaachName||"—"} (${h.uyaachRegion||"—"}) | Уралдаанч: ${h.riderName}, ${h.riderSchool||"—"}, ${h.riderAge||"—"} нас | Даатгал: ${h.insurance||"—"} | Төлбөр: ${h.needsPayment?"30,000₮":"Үнэгүй (ижил дугаар)"}`
+        ).join("\\n\\n");
         await fetch("https://api.emailjs.com/api/v1.0/email/send", {
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({
@@ -531,7 +524,9 @@ export default function App() {
               owner_name: user?.name,
               phone: user?.phone,
               horse_numbers: paid.map(h=>h.number).join(", "),
-              amount: paid.filter(h=>h.needsPayment).length * 30000
+              age_groups: paid.map(h=>h.ageGroupName).join(", "),
+              amount: paid.filter(h=>h.needsPayment).length * 30000,
+              horse_details: horseDetails
             }
           })
         });
@@ -545,7 +540,7 @@ export default function App() {
       "Дугаар","Морины нэр","Зүс","Насны ангилал",
       "Эзний нэр","Эзний цол","Эзний харъяалал",
       "Уяачийн нэр","Уяачийн цол",
-      "Уралдаанч","Уралдаанчийн хүйс","Уралдаанчийн нас","Уралдаанчийн регистр",
+      "Уралдаанч","Уралдаанчийн сургууль","Уралдаанчийн хүйс","Уралдаанчийн нас","Уралдаанчийн регистр",
       "Даатгалын дугаар","Өмнөх амжилт",
       "Төлбөр","Зөвшөөрөл","Бүртгэсэн огноо"
     ];
@@ -554,7 +549,7 @@ export default function App() {
       h.ageGroupName,
       h.ownerName, h.ownerTitle||"", h.ownerRegion||"",
       h.uyaachName||"", h.uyaachTitle||"",
-      h.riderName, h.riderGender||"", h.riderAge||"", h.riderReg||"",
+      h.riderName, h.riderSchool||"", h.riderGender||"", h.riderAge||"", h.riderReg||"",
       h.insurance||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," "),
       h.paid?"Төлсөн":"Хүлээгдэж буй",
       h.approved?"Зөвшөөрсөн":"Үгүй",
@@ -939,6 +934,8 @@ export default function App() {
                 <label>Уралдаанч хүүхдийн овог нэр *</label>
                 <input type="text" placeholder="Бүтэн нэр" value={hForm.riderName||""} onChange={e=>setField("riderName",cyrilOnly(e.target.value))}/>
                 {hFormErr.riderName&&<p className="err-msg">⚠ {hFormErr.riderName}</p>}
+                <label>Уралдаанч хүүхдийн сургууль</label>
+                <input type="text" placeholder="Сургуулийн нэр" value={hForm.riderSchool||""} onChange={e=>setField("riderSchool",cyrilOnly(e.target.value))}/>
                 <label>Уралдаанч хүүхдийн хүйс</label>
                 <div style={{display:"flex",gap:"10px",marginTop:"4px"}}>
                   {["Эрэгтэй","Эмэгтэй"].map(g=>(
@@ -1748,7 +1745,7 @@ export default function App() {
                 ["Эзний нэр",adminHorse.ownerName],
                 ["Эзний цол",adminHorse.ownerTitle||"—"],
                 ["Уяачийн нэр",adminHorse.uyaachName||"—"],
-                ["Уралдаанч хүүхдийн нэр",adminHorse.riderName],
+                ["Уралдаанч хүүхдийн нэр",adminHorse.riderName],["Уралдаанчийн сургууль",adminHorse.riderSchool||"—"],
                 ["Уралдаанчийн нас",adminHorse.riderAge||"—"],
                 ["Уралдаанч регистр",adminHorse.riderReg||"—"],
                 ["Өмнөх амжилт/ түүх",adminHorse.history||"—"],
