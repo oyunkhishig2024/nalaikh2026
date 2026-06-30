@@ -136,7 +136,12 @@ export async function markHorsesPaid(horseIds) {
 export async function getMyHorses(phone) {
   const q = query(horsesCol, where("ownerPhone", "==", phone));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const horses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return horses.sort((a,b)=>{
+    const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+    const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+    return ta - tb;
+  });
 }
 
 // ── EXPLAINER ────────────────────────────────────────────────────────────────
@@ -148,7 +153,7 @@ export async function getMyHorses(phone) {
 export async function getPaidHorses({ ageGroupId = null, search = "" } = {}) {
   let q = query(horsesCol, where("paid", "==", true));
   const snap = await getDocs(q);
-  let horses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  let horses = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>(a.number||0)-(b.number||0));
 
   if (ageGroupId) horses = horses.filter(h => h.ageGroupId === ageGroupId);
 
@@ -169,9 +174,9 @@ export async function getPaidHorses({ ageGroupId = null, search = "" } = {}) {
 
 /** Get ALL horses (admin only). */
 export async function getAllHorses() {
-  const q = query(horsesCol);
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(horsesCol);
+  const horses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return horses.sort((a,b)=>(a.number||0)-(b.number||0));
 }
 
 /** Approve a horse registration. */
@@ -198,6 +203,34 @@ export async function getAdminStats() {
   });
 
   return { total: all.length, paid: paid.length, pending: pending.length, revenue, byAge };
+}
+
+// ── REAL-TIME LISTENER ──────────────────────────────────────────────────────
+
+/**
+ * Listen to all horses in real-time.
+ * Calls callback(horses[]) whenever data changes.
+ * Returns unsubscribe function.
+ */
+export function listenAllHorses(callback) {
+  const { onSnapshot, query, orderBy } = require("firebase/firestore");
+  const q = query(horsesCol, orderBy("createdAt", "asc"));
+  return onSnapshot(q, (snap) => {
+    const horses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    callback(horses);
+  });
+}
+
+/**
+ * Listen to pending (paid but not approved) horses.
+ * Calls callback(count) whenever count changes.
+ */
+export function listenPendingCount(callback) {
+  const { onSnapshot, query, where } = require("firebase/firestore");
+  const q = query(horsesCol, where("paid", "==", true), where("approved", "==", false));
+  return onSnapshot(q, (snap) => {
+    callback(snap.size);
+  });
 }
 
 // ── REGISTRATION DEADLINE ───────────────────────────────────────────────────
