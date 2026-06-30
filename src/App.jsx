@@ -330,6 +330,27 @@ export default function App() {
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
 
+  // Poll Firebase every 5 seconds when waiting for admin approval
+  useEffect(()=>{
+    if(!waitingApproval || !user?.phone) return;
+    const interval = setInterval(async()=>{
+      try {
+        const horses = await getMyHorses(user.phone);
+        const paidHorses = horses.filter(h=>h.paid===true);
+        if(paidHorses.length>0 && paidHorses.every(h=>h.approved===true)){
+          const byAge={};
+          horses.forEach(h=>{if(!byAge[h.ageGroupId])byAge[h.ageGroupId]=[];byAge[h.ageGroupId].push(h);});
+          setAllReg(byAge);
+          setWaitingApproval(false);
+          setScreen("success");
+          showToast("Бүртгэл баталгаажлаа! 🎉");
+          clearInterval(interval);
+        }
+      } catch(e){ console.error("Polling error:", e); }
+    }, 5000);
+    return ()=>clearInterval(interval);
+  },[waitingApproval, user?.phone]);
+
   // Explainer / Admin UI
   const [expFilter, setExpFilter] = useState("all");
   const [expSearch, setExpSearch] = useState("");
@@ -1190,7 +1211,7 @@ export default function App() {
                     <span>#{h.number} {h.horseName} <span className="tag">{h.ageGroupName}</span></span>
                     {h.needsPayment
                       ? <span style={{color:"var(--gold)"}}>30,000₮</span>
-                      : <span style={{color:"#2ecc71",fontSize:"12px"}}>✓ Дугаар ашигласан — үнэгүй</span>
+                      : <span style={{color:"#2ecc71",fontSize:"12px"}}>✓ Үнэгүй</span>
                     }
                   </div>
                 ))}
@@ -1316,8 +1337,8 @@ export default function App() {
                 <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.6);opacity:0.4;}40%{transform:scale(1);opacity:1;}}`}</style>
 
                 <div style={{fontSize:"13px",color:"rgba(255,255,255,.5)",lineHeight:1.7,marginBottom:"6px"}}>
-                  Та <strong style={{color:"#ff8a80"}}>15 минутын дотор</strong> шилжүүлэлт хийнэ үү.<br/>
-                  Амжилттай шилжүүлсэн тохиолдолд<br/>танд <strong style={{color:"var(--gold)"}}>Баталгаажуулах хуудас</strong> гарч ирнэ.
+                  Та <strong style={{color:"#ff8a80"}}>15 минутын дотор</strong> төлбөрөө шилжүүлээрэй.<br/>
+                  Амжилттай шилжүүлсэн тохиолдолд танд <strong style={{color:"var(--gold)"}}>БАТАЛГААЖУУЛАХ ХУУДАС</strong> гарч ирнэ.
                 </div>
               </div>
             </div>
