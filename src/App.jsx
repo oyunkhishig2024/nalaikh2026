@@ -1589,7 +1589,7 @@ export default function App() {
                 <p>Бүх бүртгэл, төлбөр, хэрэглэгчдийн мэдээллийг энд удирдана уу.</p>
                 <div className="stats-row">
                   <div className="stat-card"><div className="stat-val">{flatHorses.length}</div><div className="stat-label">Нийт морь</div></div>
-                  <div className="stat-card"><div className="stat-val">{paidHorses.length}</div><div className="stat-label">Төлбөртэй морь</div></div>
+                  <div className="stat-card"><div className="stat-val">{paidHorses.filter(h=>h.needsPayment!==false).length}</div><div className="stat-label">Төлбөртэй морь</div></div>
                   <div className="stat-card"><div className="stat-val">{pendCount}</div><div className="stat-label">Хүлээгдэж буй</div></div>
                   <div className="stat-card"><div className="stat-val">{(paidHorses.filter(h=>h.needsPayment!==false).length*30000).toLocaleString()}₮</div><div className="stat-label">Нийт орлого</div></div>
                 </div>
