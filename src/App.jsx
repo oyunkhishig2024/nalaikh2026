@@ -853,27 +853,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Registration status banner */}
-              {regDeadline && (
-                <div style={{
-                  background: isRegClosed ? "rgba(192,57,43,.15)" : "rgba(39,174,96,.1)",
-                  border: `1px solid ${isRegClosed ? "rgba(192,57,43,.4)" : "rgba(39,174,96,.3)"}`,
-                  borderRadius:"12px", padding:"12px 16px", marginBottom:"16px",
-                  display:"flex", alignItems:"center", gap:"12px"
-                }}>
-                  <span style={{fontSize:"20px"}}>{isRegClosed ? "🔒" : "⏰"}</span>
-                  <div>
-                    <div style={{fontWeight:700, fontSize:"14px", color: isRegClosed ? "#ff8a80" : "#2ecc71"}}>
-                      {isRegClosed ? "Бүртгэл хаагдсан" : `Бүртгэл хаагдах хүртэл: ${timeLeft}`}
-                    </div>
-                    <div style={{fontSize:"12px", color:"var(--white-dim)", marginTop:"2px"}}>
-                      {isRegClosed
-                        ? "Бүртгэлийн хугацаа дууссан байна"
-                        : `Хаагдах огноо: ${new Date(regDeadline).toLocaleString("mn-MN")}`}
-                    </div>
-                  </div>
-                </div>
-              )}
               <div className="sec-title">Насны Ангилал — Морь Бүртгэх</div>
               <div className="age-grid">
                 {AGE_GROUPS.map(ag=>{
@@ -953,7 +932,26 @@ export default function App() {
                     if(f){
                       setField("horseImageName",f.name);
                       const reader=new FileReader();
-                      reader.onload=ev=>setField("horseImage",ev.target.result);
+                      reader.onload=ev=>{
+                        const img=new Image();
+                        img.onload=()=>{
+                          const canvas=document.createElement("canvas");
+                          const MAX=600;
+                          let w=img.width, h=img.height;
+                          if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
+                          else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+                          canvas.width=w; canvas.height=h;
+                          canvas.getContext("2d").drawImage(img,0,0,w,h);
+                          let quality=0.5;
+                          let result=canvas.toDataURL("image/jpeg",quality);
+                          while(result.length>700000 && quality>0.1){
+                            quality-=0.1;
+                            result=canvas.toDataURL("image/jpeg",quality);
+                          }
+                          setField("horseImage",result);
+                        };
+                        img.src=ev.target.result;
+                      };
                       reader.readAsDataURL(f);
                     }
                   }}/>
@@ -1097,8 +1095,14 @@ export default function App() {
                 {hFormErr.insurance&&<p className="err-msg">⚠ {hFormErr.insurance}</p>}
               </div>
 
-              <button className="btn-gold" onClick={saveHorse}>
-                "Хадгалаад дугаар авах ✓"
+              <button className="btn-gold" onClick={saveHorse} disabled={isSaving}
+                style={{opacity:isSaving?0.7:1,cursor:isSaving?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+                {isSaving ? (
+                  <>
+                    <span style={{display:"inline-block",width:"14px",height:"14px",border:"2px solid rgba(10,26,94,.3)",borderTopColor:"#0a1a5e",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>
+                    Дугаар авч байна...
+                  </>
+                ) : "Хадгалаад дугаар авах ✓"}
               </button>
             </div>
           )}
