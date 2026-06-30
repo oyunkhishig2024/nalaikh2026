@@ -1449,39 +1449,52 @@ export default function App() {
                       });
                       const nums=flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone).map(h=>h.number).join("-");
                       const fileName=`Налайх_наадам_${nums}.png`;
-                      canvas.toBlob(async(blob)=>{
-                        // Try Web Share API first (iOS/Android галерей)
-                        if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],"img.png",{type:"image/png"})]})){
+                      const dataUrl = canvas.toDataURL("image/png");
+
+                      // Detect platform
+                      const ua = navigator.userAgent || "";
+                      const isAndroid = /Android/i.test(ua);
+                      const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+                      if (isIOS && navigator.share) {
+                        // iOS: Web Share API works reliably and opens "Save Image" sheet
+                        canvas.toBlob(async(blob)=>{
                           try {
                             await navigator.share({
                               title:"Налайх дүүргийн наадам 2026",
-                              text:"Бүртгэл баталгаажлаа! Дугаар: "+nums,
                               files:[new File([blob],fileName,{type:"image/png"})]
                             });
                             showToast("✓ Хадгалагдлаа!");
                           } catch(e){
-                            if(e.name!=="AbortError") {
-                              // Fallback to download
-                              const url=URL.createObjectURL(blob);
-                              const a=document.createElement("a");
-                              a.href=url; a.download=fileName; a.click();
-                              URL.revokeObjectURL(url);
+                            if(e.name!=="AbortError"){
+                              const link=document.createElement("a");
+                              link.href=dataUrl; link.download=fileName;
+                              document.body.appendChild(link); link.click(); document.body.removeChild(link);
                               showToast("✓ Татаж авлаа!");
                             }
                           }
+                        },"image/png");
+                      } else {
+                        // Android & Desktop: direct download is most reliable.
+                        // On Android Chrome this saves straight into the Gallery/Photos via Downloads.
+                        const link=document.createElement("a");
+                        link.href=dataUrl; link.download=fileName;
+                        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                        if (isAndroid) {
+                          showToast("✓ Татагдлаа! Зургийн апп → Татсан зургууд");
                         } else {
-                          // Desktop fallback - download
-                          const url=URL.createObjectURL(blob);
-                          const a=document.createElement("a");
-                          a.href=url; a.download=fileName; a.click();
-                          URL.revokeObjectURL(url);
                           showToast("✓ Татаж авлаа!");
                         }
-                      },"image/png");
-                    } catch(e){ window.print(); }
+                      }
+                    } catch(e){ console.error(e); window.print(); }
                   }}>
                   📥 Хадгалах
                 </button>
+                {/* Plain-language help for older/less tech-savvy users */}
+                <div style={{fontSize:"12px",color:"rgba(255,255,255,.45)",textAlign:"center",lineHeight:1.6,padding:"0 8px"}}>
+                  📱 Зураг "Татсан файлууд" (Downloads) хавтсанд хадгалагдана.<br/>
+                  Утасныхаа <strong>Зургийн апп (Gallery/Photos)</strong> нээгээд <strong>"Татсан зургууд"</strong> эсвэл <strong>"Downloads"</strong> цомгийг шалгана уу.
+                </div>
                 <button style={{
                   width:"100%",background:"transparent",
                   border:"1px solid rgba(255,255,255,.2)",borderRadius:"14px",padding:"13px",
