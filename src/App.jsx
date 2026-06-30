@@ -464,16 +464,25 @@ export default function App() {
     const myHorsesInThisAge = myAllHorses.filter(h=>h.ageGroupId===selectedAge.id).length;
     // Reuse number only if: user has a number AND this is first horse in this age group
     const reuseNumber = myFirstNumber && myHorsesInThisAge === 0;
-    const num = reuseNumber ? myFirstNumber : getNextNumber();
     const needsPayment = !reuseNumber; // free only when reusing number in new age group
-    const horse={...hForm,number:num,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
-      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random()};
-    setPendingHorses(p=>[...p,horse]);
-    // Save to Firebase
+    showToast("Дугаар авч байна...");
+    // Get the REAL atomic number from Firebase FIRST
+    let realNum = reuseNumber ? myFirstNumber : null;
+    let fbId = null;
     try {
-      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm,number:num,needsPayment});
-      setPendingHorses(p=>p.map(h=>h.id===horse.id?{...h,fbId:fbHorse.id}:h));
-    } catch(e){ console.error("Firebase save error:", e); }
+      const fbHorse = await registerHorse(user?.id, user?.phone, selectedAge.id, selectedAge.name, {...hForm, number:0, needsPayment});
+      realNum = fbHorse.number;
+      fbId = fbHorse.id;
+    } catch(e){
+      console.error("Firebase save error:", e);
+      showToast("Алдаа: "+(e.message||e.code||"Firebase холбогдсонгүй"));
+      setIsSaving(false);
+      return;
+    }
+    if(!realNum){ showToast("Дугаар авахад алдаа гарлаа"); setIsSaving(false); return; }
+    const horse={...hForm,number:realNum,needsPayment,ageGroupId:selectedAge.id,ageGroupName:selectedAge.name,
+      ownerPhone:user?.phone,paid:false,id:Date.now()+Math.random(),fbId};
+    setPendingHorses(p=>[...p,horse]);
     setIsSaving(false);
     setScreen("numReveal");
   };
