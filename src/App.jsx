@@ -600,7 +600,7 @@ export default function App() {
       // Email notification to admin with full details
       try {
         const horseDetails = paid.map(h=>
-          `Дугаар: ${h.number} | Морь: ${h.horseName} | Ангилал: ${h.ageGroupName} | Зүс: ${h.horseColor||"—"} | Эзэн: ${h.ownerName} (${h.ownerRegion||"—"}) | Уяач: ${h.uyaachName||"—"} (${h.uyaachRegion||"—"}) | Уралдаанч: ${h.riderName}, ${h.riderSchool||"—"}, ${h.riderAge||"—"} нас | Даатгал: ${h.insurance||"—"} | Төлбөр: ${h.needsPayment?"30,000₮":"Үнэгүй (ижил дугаар)"}`
+          `Дугаар: ${h.number} | Морь: ${h.horseName} | Ангилал: ${h.ageGroupName} | Зүс: ${h.horseColor||"—"} | Эзэн: ${h.ownerName} (${h.ownerRegion||"—"}) | Уяач: ${h.uyaachName||"—"} (${h.uyaachRegion||"—"}) | Уралдаанч: ${h.riderSurname||""} ${h.riderName}, ${h.riderSchool||"—"}, ${h.riderAge||"—"} нас | Төлбөр: ${h.needsPayment?"30,000₮":"Үнэгүй (ижил дугаар)"}`
         ).join("\\n\\n");
         await fetch("https://api.emailjs.com/api/v1.0/email/send", {
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -628,8 +628,7 @@ export default function App() {
       "Дугаар","Морины нэр","Зүс","Насны ангилал",
       "Эзний нэр","Эзний цол","Эзний харъяалал",
       "Уяачийн нэр","Уяачийн цол",
-      "Уралдаанч","Уралдаанчийн сургууль","Уралдаанчийн хүйс","Уралдаанчийн нас","Уралдаанчийн регистр",
-      "Даатгалын дугаар","Өмнөх амжилт",
+      "Уралдаанч овог","Уралдаанч нэр","Уралдаанчийн сургууль","Уралдаанчийн нас","Өмнөх амжилт",
       "Төлбөр","Зөвшөөрөл","Бүртгэсэн огноо"
     ];
     const rows = flatHorses.map(h=>[
@@ -637,8 +636,7 @@ export default function App() {
       h.ageGroupName,
       h.ownerName, h.ownerTitle||"", h.ownerRegion||"",
       h.uyaachName||"", h.uyaachTitle||"",
-      h.riderName, h.riderSchool||"", h.riderGender||"", h.riderAge||"", h.riderReg||"",
-      h.insurance||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," "),
+      h.riderSurname||"", h.riderName, h.riderSchool||"", h.riderAge||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," "),
       h.paid?"Төлсөн":"Хүлээгдэж буй",
       h.approved?"Зөвшөөрсөн":"Үгүй",
       h.id ? new Date(h.id).toLocaleDateString("mn-MN") : ""
@@ -665,14 +663,12 @@ export default function App() {
     const headers = [
       "Дугаар","Морины нэр","Зүс",
       "Эзний нэр","Уяачийн нэр",
-      "Уралдаанч","Уралдаанчийн нас","Уралдаанчийн хүйс",
-      "Даатгалын дугаар","Төлбөр","Зөвшөөрөл"
+      "Уралдаанч овог","Уралдаанч нэр","Уралдаанчийн нас","Төлбөр","Зөвшөөрөл"
     ];
     const rows = horses.map(h=>[
       h.number, h.horseName, h.horseColor||"",
       h.ownerName, h.uyaachName||"",
-      h.riderName, h.riderAge||"", h.riderGender||"",
-      h.insurance||"",
+      h.riderSurname||"", h.riderName, h.riderAge||"",
       h.paid?"Төлсөн":"Хүлээгдэж буй",
       h.approved?"Зөвшөөрсөн":"Үгүй"
     ]);
@@ -1017,122 +1013,21 @@ export default function App() {
                 <input type="text" placeholder="" value={hForm.uyaachTitle||""} onChange={e=>setField("uyaachTitle",cyrilOnly(e.target.value))}/>
                 <label>Уяачийн харъяалал</label>
                 <input type="text" placeholder="Уяачийн аймаг, сум" value={hForm.uyaachRegion||""} onChange={e=>setField("uyaachRegion",cyrilOnly(e.target.value))}/>
-                <label>Уралдаанч хүүхдийн овог нэр *</label>
-                <input type="text" placeholder="Бүтэн нэр" value={hForm.riderName||""} onChange={e=>setField("riderName",cyrilOnly(e.target.value))}/>
+                <label>Уралдаанч хүүхдийн овог *</label>
+                <input type="text" placeholder="Овог" value={hForm.riderSurname||""} onChange={e=>setField("riderSurname",cyrilOnly(e.target.value))}/>
+                {hFormErr.riderSurname&&<p className="err-msg">⚠ {hFormErr.riderSurname}</p>}
+                <label>Уралдаанч хүүхдийн нэр *</label>
+                <input type="text" placeholder="Нэр" value={hForm.riderName||""} onChange={e=>setField("riderName",cyrilOnly(e.target.value))}/>
                 {hFormErr.riderName&&<p className="err-msg">⚠ {hFormErr.riderName}</p>}
                 <label>Уралдаанч хүүхдийн сургууль</label>
                 <input type="text" placeholder="Сургуулийн нэр" value={hForm.riderSchool||""} onChange={e=>setField("riderSchool",cyrilOnly(e.target.value))}/>
-                <label>Уралдаанч хүүхдийн хүйс</label>
-                <div style={{display:"flex",gap:"10px",marginTop:"4px"}}>
-                  {["Эрэгтэй","Эмэгтэй"].map(g=>(
-                    <button key={g} type="button"
-                      onClick={()=>setField("riderGender",g)}
-                      style={{flex:1,padding:"10px",borderRadius:"10px",border:`2px solid ${hForm.riderGender===g?"var(--gold)":"var(--border-white)"}`,background:hForm.riderGender===g?"var(--gold-bg)":"var(--white-faint)",color:hForm.riderGender===g?"var(--gold)":"var(--white-dim)",fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:"14px",cursor:"pointer",transition:"all .2s"}}>
-                      {g==="Эрэгтэй"?"👦 Эрэгтэй":"👧 Эмэгтэй"}
-                    </button>
-                  ))}
-                </div>
-                <label>Уралдаанч хүүхдийн регистрийн дугаар *</label>
-                <input
-                  type="text"
-                  placeholder="Жишээ нь: УШ16080752"
-                  value={hForm.riderReg||""}
-                  maxLength={10}
-                  style={{textTransform:"uppercase",letterSpacing:"2px"}}
-                  onChange={e=>setField("riderReg", regOnly(e.target.value))}
-                />
-                {hFormErr.riderReg && <p className="err-msg">⚠ {hFormErr.riderReg}</p>}
-                {hForm.riderReg && hForm.riderReg.length >= 4 && (()=>{
-                  const yy = parseInt(hForm.riderReg.slice(2,4), 10);
-                  if (isNaN(yy)) return null;
-                  const birthYear = yy <= 26 ? 2000 + yy : 1900 + yy;
-                  const age = 2026 - birthYear;
-                  const tooYoung = birthYear > (2026 - 8);
-                  // Auto-fill riderAge if valid
-                  if (!tooYoung && hForm.riderAge !== String(age)) {
-                    setTimeout(()=>setField("riderAge", String(age)), 0);
-                  }
-                  if (tooYoung) return (
-                    <div style={{background:"rgba(192,57,43,.12)",border:"1px solid rgba(192,57,43,.35)",borderRadius:"8px",padding:"12px 14px",marginTop:"8px",fontSize:"13px",lineHeight:1.6,color:"#ff8a80"}}>
-                      Үндэсний их баяр наадмын үндэсний хурдан морины уралдаанд уралдах морийг 8 ба түүнээс дээш насны хүүхэд унаж уралдана.
-                    </div>
-                  );
-                  return (
-                    <div style={{background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"8px",padding:"9px 14px",marginTop:"8px",fontSize:"13px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{color:"#2ecc71",fontWeight:700}}>{birthYear} онд төрсөн</span>
-                      <span style={{background:"rgba(39,174,96,.2)",border:"1px solid rgba(39,174,96,.4)",borderRadius:"20px",padding:"2px 12px",color:"#2ecc71",fontWeight:800,fontSize:"15px"}}>{age} нас</span>
-                    </div>
-                  );
-                })()}
-                <label>Уралдаанч хүүхдийн нас</label>
-                <input type="number" placeholder="Регистрээс автоматаар бөглөгдөнө" min={8} max={18}
+                <label>Уралдаанч хүүхдийн нас *</label>
+                <input type="number" placeholder="Нас" min={1} max={18}
                   value={hForm.riderAge||""}
                   onChange={e=>setField("riderAge",e.target.value)}
-                  style={{background: hForm.riderAge ? "rgba(39,174,96,.1)" : "var(--white-faint)",
-                    border: hForm.riderAge ? "1px solid rgba(39,174,96,.4)" : "1px solid var(--border-white)",
-                    color: hForm.riderAge ? "#2ecc71" : "var(--white)", fontWeight: hForm.riderAge ? 700 : 400}}
+                  style={{fontSize:"18px",textAlign:"center"}}
                 />
-
-                <label>Зөвшөөрлийн бичиг *</label>
-                <div className={`upload-zone ${hForm.riderConsent?"filled":""}`}>
-                  <input type="file" accept="image/*,.pdf" onChange={e=>{
-                    const f=e.target.files[0];
-                    if(f){
-                      setField("riderConsentName",f.name);
-                      if(f.type.startsWith("image/")){
-                        const r=new FileReader();
-                        r.onload=ev=>{
-                          const img=new Image();
-                          img.onload=()=>{
-                            const canvas=document.createElement("canvas");
-                            const MAX=600;
-                            let w=img.width, h=img.height;
-                            if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
-                            else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
-                            canvas.width=w; canvas.height=h;
-                            canvas.getContext("2d").drawImage(img,0,0,w,h);
-                            let quality=0.5;
-                            let result=canvas.toDataURL("image/jpeg",quality);
-                            while(result.length>700000 && quality>0.1){
-                              quality-=0.1;
-                              result=canvas.toDataURL("image/jpeg",quality);
-                            }
-                            setField("riderConsent",result);
-                          };
-                          img.src=ev.target.result;
-                        };
-                        r.readAsDataURL(f);
-                      } else { setField("riderConsent","pdf:"+f.name); }
-                    }
-                  }}/>
-                  {hForm.riderConsent
-                    ? hForm.riderConsent.startsWith("pdf:")
-                      ? <div style={{color:"var(--gold)",fontSize:"12px"}}>📄 {hForm.riderConsentName}</div>
-                      : <><img src={hForm.riderConsent} style={{width:"100%",maxHeight:"220px",objectFit:"contain",borderRadius:"7px",marginTop:"6px",background:"rgba(0,0,0,0.15)"}} alt="consent"/><div style={{color:"var(--gold)",fontSize:"11px",marginTop:"6px"}}>✓ {hForm.riderConsentName}</div></>
-                    : <><div style={{fontSize:"24px"}}>📄</div><div className="upload-lbl">Зураг / PDF оруулах</div></>
-                  }
-                </div>
-                {hFormErr.riderConsent&&<p className="err-msg">⚠ {hFormErr.riderConsent}</p>}
-
-                <label>Даатгалын баримтын сүүлийн 5 оронтой дугаар *</label>
-                <p style={{fontSize:"12px",color:"var(--white-dim)",margin:"4px 0 8px",lineHeight:1.5}}>Хүүхдийн даатгалын баримтын дугаарын сүүлийн 5 оронтой тоог оруулна уу.</p>
-                <input
-                  type="text"
-                  placeholder="Жишээ: 12345"
-                  maxLength={5}
-                  value={hForm.insurance||""}
-                  onChange={e=>{
-                    const v=e.target.value.replace(/[^0-9]/g,"").slice(0,5);
-                    setField("insurance",v);
-                  }}
-                  style={{letterSpacing:"4px",fontSize:"20px",textAlign:"center",fontFamily:"'Cinzel',serif"}}
-                />
-                {hForm.insurance && hForm.insurance.length===5 && (
-                  <div style={{background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"8px",padding:"9px 14px",marginTop:"8px",fontSize:"13px",color:"#2ecc71",fontWeight:700}}>
-                    ✓ Даатгалын дугаар: ***{hForm.insurance}
-                  </div>
-                )}
-                {hFormErr.insurance&&<p className="err-msg">⚠ {hFormErr.insurance}</p>}
+                {hFormErr.riderAge&&<p className="err-msg">⚠ {hFormErr.riderAge}</p>}
               </div>
 
               <button className="btn-gold" onClick={saveHorse} disabled={isSaving}
@@ -1398,7 +1293,7 @@ export default function App() {
                           <div style={{display:"inline-block",background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"6px",padding:"2px 8px",fontSize:"11px",color:"#f5d882",marginBottom:"6px"}}>{h.ageGroupName}</div>
                           <div style={{fontSize:"12px",color:"rgba(255,255,255,.6)",lineHeight:1.6}}>
                             Уяач: {h.uyaachName||"—"}<br/>
-                            Уралдаанч: {h.riderName}{h.riderAge?` · ${h.riderAge} нас`:""}
+                            Уралдаанч: {h.riderSurname||""} {h.riderName}{h.riderAge?` · ${h.riderAge} нас`:""}
                           </div>
                         </div>
                       </div>
@@ -1869,9 +1764,8 @@ export default function App() {
                 ["Эзний нэр",adminHorse.ownerName],
                 ["Эзний цол",adminHorse.ownerTitle||"—"],
                 ["Уяачийн нэр",adminHorse.uyaachName||"—"],
-                ["Уралдаанч хүүхдийн нэр",adminHorse.riderName],["Уралдаанчийн сургууль",adminHorse.riderSchool||"—"],
+                ["Уралдаанч хүүхдийн овог",adminHorse.riderSurname||"—"],["Уралдаанч хүүхдийн нэр",adminHorse.riderName],["Уралдаанчийн сургууль",adminHorse.riderSchool||"—"],
                 ["Уралдаанчийн нас",adminHorse.riderAge||"—"],
-                ["Уралдаанч регистр",adminHorse.riderReg||"—"],
                 ["Өмнөх амжилт/ түүх",adminHorse.history||"—"],
               ].map(([l,v])=>(
                 <div key={l} className="detail-row"><span className="detail-lbl">{l}</span><span>{v}</span></div>
