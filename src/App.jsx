@@ -509,7 +509,17 @@ export default function App() {
     if(!f.uyaachName)e.uyaachName="Уяачийн нэр оруулна уу";
     if(!f.riderName)e.riderName="Уралдаанч хүүхдийн нэр оруулна уу";
     // Validate rider registration number and minimum age
-
+    if(!f.riderReg){
+      e.riderReg="Уралдаанч хүүхдийн регистрийн дугаар оруулна уу";
+    } else {
+      const parsed = parseRegNum(f.riderReg);
+      if(!parsed.valid) {
+        if(parsed.tooYoung) e.riderReg = "Үндэсний их баяр наадмын үндэсний хурдан морины уралдаанд уралдах морийг 8 ба түүнээс дээш насны хүүхэд унаж уралдана.";
+        else e.riderReg = parsed.reason;
+      }
+    }
+    if(!f.riderConsent)e.riderConsent="Зөвшөөрлийн баримт шаардлагатай";
+    if(!f.insurance||f.insurance.length!==5)e.insurance="Даатгалын баримтын сүүлийн 5 оронтой дугаар оруулна уу";
     return e;
   };
 
@@ -571,7 +581,7 @@ export default function App() {
     await new Promise(r=>setTimeout(r,300));
     {
       // Mark as paid (pending admin approval)
-      const paid=pendingHorses.map(h=>({...h,paid:true,approved:false}));
+      const paid=pendingHorses.map(h=>({...h,paid:true,approved:h.needsPayment===false?true:false}));
       setAllReg(prev=>{
         const n={...prev};
         paid.forEach(h=>{if(!n[h.ageGroupId])n[h.ageGroupId]=[];n[h.ageGroupId]=[...n[h.ageGroupId],h];});
@@ -585,8 +595,15 @@ export default function App() {
       } catch(e){ console.error(e); }
       setPendingHorses([]);
       setPayLoading(false);
-      setWaitingApproval(true);
-      setScreen("waiting");
+      // If all horses are free (needsPayment===false), skip waiting and go to success
+      const allFree = paid.every(h=>h.needsPayment===false);
+      if(allFree){
+        setScreen("success");
+        showToast("Бүртгэл баталгаажлаа! 🎉");
+      } else {
+        setWaitingApproval(true);
+        setScreen("waiting");
+      }
       // Email notification to admin with full details
       try {
         const horseDetails = paid.map(h=>
@@ -1761,7 +1778,7 @@ export default function App() {
                 <div key={l} className="detail-row"><span className="detail-lbl">{l}</span><span>{v}</span></div>
               ))}
 
-              <div style={{display:"flex",gap:"8px",marginTop:"16px"}}>
+              <div style={{display:"flex",gap:"8px",marginTop:"16px",flexWrap:"wrap"}}>
                 {!adminHorse.approved&&adminHorse.paid&&(
                   <button className="btn-gold" style={{flex:1,marginTop:0}} onClick={()=>{adminApprove(adminHorse);setAdminHorse(h=>({...h,approved:true}));}}>
                     ✓ Зөвшөөрөх
@@ -1771,6 +1788,15 @@ export default function App() {
                   <div style={{flex:1,textAlign:"center",padding:"12px",background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"10px",color:"#2ecc71",fontWeight:700,fontSize:"14px"}}>
                     ✅ Баталгаажсан
                   </div>
+                )}
+                {/* Delete button - available for unpaid/pending horses */}
+                {!adminHorse.approved&&(
+                  <button className="btn-red" style={{flex:1}} onClick={()=>{
+                    if(window.confirm(`"${adminHorse.horseName}" бүртгэлийг устгах уу?`)){
+                      adminReject(adminHorse);
+                      setAdminHorse(null);
+                    }
+                  }}>🗑 Устгах</button>
                 )}
                 <button style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.12)",borderRadius:"10px",padding:"12px",color:"rgba(255,255,255,.4)",fontFamily:"'Nunito',sans-serif",fontSize:"13px",cursor:"pointer"}} onClick={()=>setAdminHorse(null)}>Хаах</button>
               </div>
