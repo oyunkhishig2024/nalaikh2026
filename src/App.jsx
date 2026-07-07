@@ -256,7 +256,7 @@ export default function App() {
   // Registration deadline — admin sets this, stored in localStorage
   const [regDeadline, setRegDeadline] = useState(()=>{
     const saved = localStorage.getItem("naadam_reg_deadline");
-    return saved || "2026-07-08T06:00";
+    return saved || "2026-12-31T23:59";
   });
   const isRegClosed = regDeadline && new Date() > new Date(regDeadline);
 
