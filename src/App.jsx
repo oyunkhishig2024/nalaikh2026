@@ -613,7 +613,7 @@ export default function App() {
               phone: user?.phone,
               horse_numbers: paid.map(h=>h.number).join(", "),
               age_groups: paid.map(h=>h.ageGroupName).join(", "),
-              amount: paid.filter(h=>h.needsPayment).length * 30000 + (paid.some(h=>h.taviachNum>0)?30000:0),
+              amount: paid.filter(h=>h.needsPayment).length * 30000 + (paid.filter(h=>h.taviachNum>0).length*30000),
               horse_details: horseDetails
             }
           })
@@ -1158,7 +1158,7 @@ export default function App() {
                 ))}
                 <div className="pay-row pay-total">
                   <span>Нийт дүн</span>
-                  <span>{(pendingHorses.filter(h=>h.needsPayment).length*30000 + (pendingHorses.some(h=>h.taviachNum>0)?30000:0)).toLocaleString()}₮</span>
+                  <span>{(pendingHorses.filter(h=>h.needsPayment).length*30000 + (pendingHorses.filter(h=>h.taviachNum>0).length*30000)).toLocaleString()}₮</span>
                 </div>
                 {pendingHorses.some(h=>!h.needsPayment) && (
                   <div style={{fontSize:"12px",color:"rgba(255,255,255,.5)",marginTop:"8px",padding:"8px 0",borderTop:"1px solid var(--border-white)",lineHeight:1.6}}>
@@ -1191,7 +1191,7 @@ export default function App() {
                 </div>
                 <div className="bank-info-row">
                   <span className="bank-info-label">Шилжүүлэх дүн</span>
-                  <span className="bank-info-val highlight">{(pendingHorses.filter(h=>h.needsPayment).length*30000 + (pendingHorses.some(h=>h.taviachNum>0)?30000:0)).toLocaleString()}₮</span>
+                  <span className="bank-info-val highlight">{(pendingHorses.filter(h=>h.needsPayment).length*30000 + (pendingHorses.filter(h=>h.taviachNum>0).length*30000)).toLocaleString()}₮</span>
                 </div>
               </div>
 
@@ -1255,7 +1255,7 @@ export default function App() {
                       {(()=>{
                         const myHorses = flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone);
                         const horseFee = myHorses.filter(h=>h.needsPayment!==false).length * 30000;
-                        const taviachFee = myHorses.some(h=>h.taviachNum>0) ? 30000 : 0;
+                        const taviachFee = myHorses.filter(h=>h.taviachNum>0).length * 30000;
                         return (horseFee + taviachFee).toLocaleString();
                       })()}₮
                     </span>
