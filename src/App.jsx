@@ -1667,10 +1667,15 @@ export default function App() {
                           <div key={h.id} className="horse-item" onClick={()=>setAdminHorse(h)}>
                             <div className="horse-num">{h.number}</div>
                             <div><div className="horse-name">{h.horseName}</div><div className="horse-meta">Эзэн: {h.ownerName} · Уяач: {h.uyaachName||"—"} · Уралдаанч: {h.riderName}</div></div>
-                            <div style={{display:"flex",flexDirection:"column",gap:"4px",alignItems:"flex-end",marginLeft:"auto"}}>
-                              {h.paid?<span className="status-paid">✓ Төлсөн</span>:<span className="status-pend">⏳ Хүлээгдэж буй</span>}
-                              {!h.approved&&h.paid&&<button className="btn-gold" style={{padding:"4px 10px",fontSize:"11px",marginTop:"0",width:"auto"}} onClick={e=>{e.stopPropagation();adminApprove(h);}}>Зөвшөөрөх</button>}
-                              {h.approved&&<span style={{fontSize:"11px",color:"var(--green-t)"}}>✓ Зөвшөөрсөн</span>}
+                            <div style={{display:"flex",flexDirection:"column",gap:"4px",alignItems:"flex-end",marginLeft:"auto",minWidth:"100px"}}>
+                              {h.paid&&!h.approved&&(
+                                <button style={{background:"linear-gradient(135deg,#b8922a,#e8c060)",border:"none",borderRadius:"8px",padding:"7px 14px",color:"#0a1a5e",fontFamily:"'Nunito',sans-serif",fontSize:"12px",fontWeight:700,cursor:"pointer",width:"100%"}}
+                                  onClick={e=>{e.stopPropagation();adminApprove(h);}}>✓ Зөвшөөрөх</button>
+                              )}
+                              {h.approved&&<span style={{fontSize:"11px",color:"#2ecc71",fontWeight:700}}>✅ Зөвшөөрсөн</span>}
+                              {!h.paid&&<span style={{fontSize:"11px",color:"#ff8a80"}}>⏳ Төлөөгүй</span>}
+                              <button style={{background:"rgba(192,57,43,.2)",border:"1px solid rgba(192,57,43,.4)",borderRadius:"8px",padding:"5px 10px",color:"#ff8a80",fontFamily:"'Nunito',sans-serif",fontSize:"11px",fontWeight:600,cursor:"pointer",width:"100%"}}
+                                onClick={e=>{e.stopPropagation();if(window.confirm("Устгах уу?")){adminReject(h);}}}>🗑 Устгах</button>
                             </div>
                           </div>
                         ))}
