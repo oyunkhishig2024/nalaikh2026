@@ -1018,7 +1018,7 @@ export default function App() {
                 <div style={{background:"rgba(232,192,96,.08)",border:"1px solid rgba(232,192,96,.25)",borderRadius:"14px",padding:"16px",margin:"8px 0"}}>
                   <div style={{fontWeight:700,fontSize:"14px",marginBottom:"4px",color:"var(--gold)"}}>🏁 Морь тавиач</div>
                   <div style={{fontSize:"12px",color:"rgba(255,255,255,.5)",marginBottom:"12px",lineHeight:1.6}}>
-                    Дугаар: 1–50 · Нэг дугаар нэг л удаа · <strong style={{color:"#e8c060"}}>30,000₮</strong>
+                    Дугаар: 1–150 · Нэг дугаар нэг л удаа · <strong style={{color:"#e8c060"}}>30,000₮</strong>
                   </div>
                   {!hForm.taviachNum ? (
                     <div style={{display:"flex",gap:"10px"}}>
@@ -1031,7 +1031,7 @@ export default function App() {
                             const snap = await tx.get(tRef);
                             if(!snap.exists()){tx.set(tRef,{nextTaviach:2});return 1;}
                             const n = snap.data().nextTaviach;
-                            if(n>50){throw new Error("Тавиачийн дугаар 50-аас хэтэрлээ!");}
+                            if(n>150){throw new Error("Тавиачийн дугаар 150-аас хэтэрлээ!");}
                             tx.update(tRef,{nextTaviach:n+1});
                             return n;
                           });
