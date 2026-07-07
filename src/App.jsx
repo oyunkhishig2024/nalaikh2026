@@ -1491,7 +1491,8 @@ export default function App() {
                 ))}
               </div>
 
-              {flatHorses.length===0
+              <input type="text" placeholder="🔍 Дугаар, морины нэр, эзний нэрээр хайх..." value={adminSearch||""} onChange={e=>setAdminSearch(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"10px",padding:"10px 14px",color:"#fff",fontFamily:"'Nunito',sans-serif",fontSize:"14px",marginBottom:"12px",outline:"none"}}/>
+                  {flatHorses.length===0
                 ? <div className="empty-state"><div className="big">📋</div><div>Одоохондоо бүртгэлтэй морь байхгүй байна</div></div>
                 : <div className="horse-grid">
                     {flatHorses
@@ -1616,6 +1617,10 @@ export default function App() {
                 <>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px",flexWrap:"wrap",gap:"8px"}}>
                     <div className="sec-title" style={{margin:0}}>Бүх Бүртгэлүүд ({flatHorses.length})</div>
+                  </div>
+                  <input type="text" placeholder="🔍 Дугаар, морины нэр, эзний нэрээр хайх..." value={adminSearch||""} onChange={e=>setAdminSearch(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"10px",padding:"10px 14px",color:"#fff",fontFamily:"Nunito",fontSize:"14px",marginBottom:"12px"}}/>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
+                    <div></div>
                     {flatHorses.filter(h=>h.paid&&!h.approved).length>0&&(
                       <button className="btn-gold" style={{marginTop:0,padding:"8px 16px",fontSize:"13px"}}
                         onClick={async()=>{
@@ -1640,7 +1645,7 @@ export default function App() {
                   </div>
                   {flatHorses.length===0
                     ? <div className="empty-state"><div className="big">📋</div><div>Бүртгэл байхгүй байна</div></div>
-                    : flatHorses.sort((a,b)=>a.number-b.number).map(h=>(
+                    : flatHorses.filter(h=>{if(!adminSearch)return true;const s=adminSearch.toLowerCase();return String(h.number).includes(s)||String(h.horseName||"").toLowerCase().includes(s)||String(h.ownerName||"").toLowerCase().includes(s);}).sort((a,b)=>a.number-b.number).map(h=>(
                       <div key={h.id} className="horse-item" onClick={()=>setAdminHorse(h)}>
                         <div className="horse-num">{h.number}</div>
                         <div>
