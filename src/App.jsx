@@ -1041,7 +1041,7 @@ export default function App() {
                           showToast("Алдаа: "+(e.message||"Дугаар авахад алдаа гарлаа"));
                         }
                       }}>Тийм — 30,000₮</button>
-                      <button type="button" className="btn-outline" style={{flex:1}} onClick={()=>setField("taviachNum", 0)}>Үгүй</button>
+                      <button type="button" className="btn-gold" style={{flex:1,marginTop:0,fontSize:"14px"}} onClick={()=>setField("taviachNum", 0)}>Үгүй</button>
                     </div>
                   ) : hForm.taviachNum > 0 ? (
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"10px",padding:"10px 14px"}}>
@@ -1052,7 +1052,10 @@ export default function App() {
                       <button type="button" onClick={()=>setField("taviachNum",null)} style={{background:"none",border:"1px solid rgba(255,255,255,.2)",borderRadius:"8px",padding:"6px 12px",color:"rgba(255,255,255,.4)",cursor:"pointer",fontSize:"12px"}}>Цуцлах</button>
                     </div>
                   ) : (
-                    <div style={{textAlign:"center",fontSize:"13px",color:"rgba(255,255,255,.4)",padding:"8px"}}>✓ Тавиач авахгүй</div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"10px",padding:"10px 14px"}}>
+                      <div style={{fontSize:"13px",color:"rgba(255,255,255,.6)",fontWeight:600}}>✓ Тавиач авахгүй</div>
+                      <button type="button" onClick={()=>setField("taviachNum",null)} style={{background:"rgba(232,192,96,.1)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"8px",padding:"6px 12px",color:"var(--gold)",cursor:"pointer",fontSize:"12px",fontWeight:600}}>Өөрчлөх</button>
+                    </div>
                   )}
                 </div>
 
@@ -1611,7 +1614,30 @@ export default function App() {
               {/* All Horses */}
               {adminTab==="horses" && (
                 <>
-                  <div className="sec-title">Бүх Бүртгэлүүд ({flatHorses.length})</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px",flexWrap:"wrap",gap:"8px"}}>
+                    <div className="sec-title" style={{margin:0}}>Бүх Бүртгэлүүд ({flatHorses.length})</div>
+                    {flatHorses.filter(h=>h.paid&&!h.approved).length>0&&(
+                      <button className="btn-gold" style={{marginTop:0,padding:"8px 16px",fontSize:"13px"}}
+                        onClick={async()=>{
+                          const pending=flatHorses.filter(h=>h.paid&&!h.approved);
+                          if(!window.confirm(`Төлбөр төлсөн ${pending.length} морийг бүгдийг зөвшөөрөх үү?`)) return;
+                          for(const h of pending){
+                            try{ await approveHorse(h.fbId||h.id); }catch(e){ console.error(e); }
+                          }
+                          setAllReg(prev=>{
+                            const n={...prev};
+                            Object.keys(n).forEach(age=>{
+                              n[age]=n[age].map(x=>x.paid&&!x.approved?{...x,approved:true}:x);
+                            });
+                            return n;
+                          });
+                          setAdminPendingCount(0);
+                          showToast(`✓ ${pending.length} морь бүгд зөвшөөрөгдлөө!`);
+                        }}>
+                        ✓ Бүгдийг зөвшөөрөх ({flatHorses.filter(h=>h.paid&&!h.approved).length})
+                      </button>
+                    )}
+                  </div>
                   {flatHorses.length===0
                     ? <div className="empty-state"><div className="big">📋</div><div>Бүртгэл байхгүй байна</div></div>
                     : flatHorses.sort((a,b)=>a.number-b.number).map(h=>(
