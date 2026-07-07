@@ -355,7 +355,6 @@ export default function App() {
 
   // Explainer / Admin UI
   const [expFilter, setExpFilter] = useState("all");
-  const [adminSearch, setAdminSearch] = useState("");
   const [expSearch, setExpSearch] = useState("");
   const [expHorse, setExpHorse] = useState(null);
   const [adminTab, setAdminTab] = useState("overview");
@@ -614,7 +613,7 @@ export default function App() {
               phone: user?.phone,
               horse_numbers: paid.map(h=>h.number).join(", "),
               age_groups: paid.map(h=>h.ageGroupName).join(", "),
-              amount: paid.filter(h=>h.needsPayment).length * 30000,
+              amount: paid.filter(h=>h.needsPayment).length * 30000 + (paid.some(h=>h.taviachNum>0)?30000:0),
               horse_details: horseDetails
             }
           })
@@ -1159,7 +1158,7 @@ export default function App() {
                 ))}
                 <div className="pay-row pay-total">
                   <span>Нийт дүн</span>
-                  <span>{(pendingHorses.filter(h=>h.needsPayment).length*30000).toLocaleString()}₮</span>
+                  <span>{(pendingHorses.filter(h=>h.needsPayment).length*30000 + (pendingHorses.some(h=>h.taviachNum>0)?30000:0)).toLocaleString()}₮</span>
                 </div>
                 {pendingHorses.some(h=>!h.needsPayment) && (
                   <div style={{fontSize:"12px",color:"rgba(255,255,255,.5)",marginTop:"8px",padding:"8px 0",borderTop:"1px solid var(--border-white)",lineHeight:1.6}}>
@@ -1192,7 +1191,7 @@ export default function App() {
                 </div>
                 <div className="bank-info-row">
                   <span className="bank-info-label">Шилжүүлэх дүн</span>
-                  <span className="bank-info-val highlight">{(pendingHorses.filter(h=>h.needsPayment).length*30000).toLocaleString()}₮</span>
+                  <span className="bank-info-val highlight">{(pendingHorses.filter(h=>h.needsPayment).length*30000 + (pendingHorses.some(h=>h.taviachNum>0)?30000:0)).toLocaleString()}₮</span>
                 </div>
               </div>
 
@@ -1253,7 +1252,12 @@ export default function App() {
                   <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
                     <span style={{color:"var(--white-dim)"}}>Дүн</span>
                     <span style={{fontWeight:700,color:"var(--gold)",fontSize:"15px"}}>
-                      {((flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone&&h.needsPayment!==false).length*30000)+(pendingHorses.some(h=>h.taviachNum>0)?30000:0)).toLocaleString()}₮
+                      {(()=>{
+                        const myHorses = flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone);
+                        const horseFee = myHorses.filter(h=>h.needsPayment!==false).length * 30000;
+                        const taviachFee = myHorses.some(h=>h.taviachNum>0) ? 30000 : 0;
+                        return (horseFee + taviachFee).toLocaleString();
+                      })()}₮
                     </span>
                   </div>
                   <div style={{padding:"8px 0 2px",fontSize:"13px"}}>
@@ -1492,8 +1496,7 @@ export default function App() {
                 ))}
               </div>
 
-              <input type="text" placeholder="🔍 Дугаар, морины нэр, эзний нэрээр хайх..." value={adminSearch||""} onChange={e=>setAdminSearch(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"10px",padding:"10px 14px",color:"#fff",fontFamily:"'Nunito',sans-serif",fontSize:"14px",marginBottom:"12px",outline:"none"}}/>
-                  {flatHorses.length===0
+              {flatHorses.length===0
                 ? <div className="empty-state"><div className="big">📋</div><div>Одоохондоо бүртгэлтэй морь байхгүй байна</div></div>
                 : <div className="horse-grid">
                     {flatHorses
@@ -1618,10 +1621,6 @@ export default function App() {
                 <>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px",flexWrap:"wrap",gap:"8px"}}>
                     <div className="sec-title" style={{margin:0}}>Бүх Бүртгэлүүд ({flatHorses.length})</div>
-                  </div>
-                  <input type="text" placeholder="🔍 Дугаар, морины нэр, эзний нэрээр хайх..." value={adminSearch||""} onChange={e=>setAdminSearch(e.target.value)} style={{width:"100%",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"10px",padding:"10px 14px",color:"#fff",fontFamily:"Nunito",fontSize:"14px",marginBottom:"12px"}}/>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
-                    <div></div>
                     {flatHorses.filter(h=>h.paid&&!h.approved).length>0&&(
                       <button className="btn-gold" style={{marginTop:0,padding:"8px 16px",fontSize:"13px"}}
                         onClick={async()=>{
@@ -1646,23 +1645,14 @@ export default function App() {
                   </div>
                   {flatHorses.length===0
                     ? <div className="empty-state"><div className="big">📋</div><div>Бүртгэл байхгүй байна</div></div>
-                    : flatHorses.filter(h=>{if(!adminSearch)return true;const s=adminSearch.toLowerCase();return String(h.number).includes(s)||String(h.horseName||"").toLowerCase().includes(s)||String(h.ownerName||"").toLowerCase().includes(s);}).sort((a,b)=>a.number-b.number).map(h=>(
+                    : flatHorses.sort((a,b)=>a.number-b.number).map(h=>(
                       <div key={h.id} className="horse-item" onClick={()=>setAdminHorse(h)}>
                         <div className="horse-num">{h.number}</div>
                         <div>
                           <div className="horse-name">{h.horseName} <span className="tag">{h.ageGroupName}</span></div>
                           <div className="horse-meta">Эзэн: {h.ownerName} · Уяач: {h.uyaachName||"—"} · Уралдаанч: {h.riderName}</div>
                         </div>
-                        <div style={{display:"flex",flexDirection:"column",gap:"4px",alignItems:"flex-end",marginLeft:"auto",minWidth:"110px"}}>
-                          {h.paid&&!h.approved&&(
-                            <button style={{background:"linear-gradient(135deg,#b8922a,#e8c060)",border:"none",borderRadius:"8px",padding:"7px 14px",color:"#0a1a5e",fontFamily:"'Nunito',sans-serif",fontSize:"12px",fontWeight:700,cursor:"pointer",width:"100%"}}
-                              onClick={e=>{e.stopPropagation();adminApprove(h);}}>✓ Зөвшөөрөх</button>
-                          )}
-                          {h.approved&&<span style={{fontSize:"11px",color:"#2ecc71",fontWeight:700}}>✅ Зөвшөөрсөн</span>}
-                          {!h.paid&&<span style={{fontSize:"11px",color:"#ff8a80"}}>⏳ Төлөөгүй</span>}
-                          <button style={{background:"rgba(192,57,43,.2)",border:"1px solid rgba(192,57,43,.4)",borderRadius:"8px",padding:"5px 10px",color:"#ff8a80",fontFamily:"'Nunito',sans-serif",fontSize:"11px",fontWeight:600,cursor:"pointer",width:"100%"}}
-                            onClick={e=>{e.stopPropagation();if(window.confirm("Устгах уу?")){adminReject(h);}}}>🗑 Устгах</button>
-                        </div>
+                        {h.paid?<span className="status-paid">✓ Төлсөн</span>:<span className="status-pend">⏳ Хүлээгдэж буй</span>}
                       </div>
                     ))
                   }
