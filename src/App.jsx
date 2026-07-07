@@ -355,6 +355,7 @@ export default function App() {
 
   // Explainer / Admin UI
   const [expFilter, setExpFilter] = useState("all");
+  const [adminSearch, setAdminSearch] = useState("");
   const [expSearch, setExpSearch] = useState("");
   const [expHorse, setExpHorse] = useState(null);
   const [adminTab, setAdminTab] = useState("overview");
