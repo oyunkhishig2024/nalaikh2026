@@ -509,19 +509,10 @@ export default function App() {
     if(!f.horseName)e.horseName="Морины нэр оруулна уу";
     if(!f.ownerName)e.ownerName="Эзний нэр оруулна уу";
     if(!f.uyaachName)e.uyaachName="Уяачийн нэр оруулна уу";
+    if(!f.riderSurname)e.riderSurname="Уралдаанч хүүхдийн овог оруулна уу";
     if(!f.riderName)e.riderName="Уралдаанч хүүхдийн нэр оруулна уу";
-    // Validate rider registration number and minimum age
-    if(!f.riderReg){
-      e.riderReg="Уралдаанч хүүхдийн регистрийн дугаар оруулна уу";
-    } else {
-      const parsed = parseRegNum(f.riderReg);
-      if(!parsed.valid) {
-        if(parsed.tooYoung) e.riderReg = "Үндэсний их баяр наадмын үндэсний хурдан морины уралдаанд уралдах морийг 8 ба түүнээс дээш насны хүүхэд унаж уралдана.";
-        else e.riderReg = parsed.reason;
-      }
-    }
-    if(!f.riderConsent)e.riderConsent="Зөвшөөрлийн баримт шаардлагатай";
-    if(!f.insurance||f.insurance.length!==5)e.insurance="Даатгалын баримтын сүүлийн 5 оронтой дугаар оруулна уу";
+    if(!f.riderAge)e.riderAge="Уралдаанч хүүхдийн нас оруулна уу";
+    if(f.taviachNum===null||f.taviachNum===undefined)e.taviachNum="Тавиачийн дугаар авах эсэхээ сонгоно уу";
     return e;
   };
 
