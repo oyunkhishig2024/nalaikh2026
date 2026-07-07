@@ -1024,7 +1024,7 @@ export default function App() {
                     <div style={{display:"flex",gap:"10px"}}>
                       <button type="button" className="btn-gold" style={{flex:1,marginTop:0,fontSize:"14px"}} onClick={async()=>{
                         try {
-                          const {getFirestore,doc,runTransaction} = await import("firebase/firestore");
+                          const {getFirestore,doc,runTransaction,setDoc} = await import("firebase/firestore");
                           const db2 = getFirestore();
                           const tRef = doc(db2,"meta","taviach_sequences");
                           const num = await runTransaction(db2, async(tx)=>{
