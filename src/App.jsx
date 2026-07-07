@@ -325,7 +325,9 @@ export default function App() {
 
   // Payment
   const [payLoading, setPayLoading] = useState(false);
+  const [taviachNum, setTaviachNum] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+   // Морь тавиачийн дугаар
   const [adminPendingCount, setAdminPendingCount] = useState(0);
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalPollInterval, setApprovalPollInterval] = useState(null);
@@ -949,7 +951,7 @@ export default function App() {
                   <label>Морины зүс</label>
                   <input type="text" placeholder="Жишээ: Хүрэн, Шарга, Бор, Хар..." value={hForm.horseColor||""} onChange={e=>setField("horseColor",cyrilOnly(e.target.value))}/>
                 </div>
-                <label>Морины зураг (9×12) *</label>
+                <label>Морины зураг (9×12) <span style={{fontSize:'11px',color:'rgba(255,255,255,.4)',fontWeight:400}}>(заавал биш)</span></label>
                 <div className={`upload-zone ${hForm.horseImage?"filled":""}`}>
                   <input type="file" accept="image/*" onChange={e=>{
                     const f=e.target.files[0];
@@ -1213,7 +1215,7 @@ export default function App() {
                   <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
                     <span style={{color:"var(--white-dim)"}}>Дүн</span>
                     <span style={{fontWeight:700,color:"var(--gold)",fontSize:"15px"}}>
-                      {(flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone&&h.needsPayment!==false).length*30000).toLocaleString()}₮
+                      {((flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone&&h.needsPayment!==false).length*30000)+(taviachNum>0?30000:0)).toLocaleString()}₮
                     </span>
                   </div>
                   <div style={{padding:"8px 0 2px",fontSize:"13px"}}>
@@ -1297,6 +1299,12 @@ export default function App() {
                         </div>
                         <div style={{flex:1}}>
                           <div style={{fontWeight:700,fontSize:"16px",marginBottom:"4px"}}>{h.horseName}</div>
+                          {taviachNum>0 && (
+                            <div style={{marginTop:"6px",padding:"6px 10px",background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <span style={{fontSize:"12px",color:"#2ecc71",fontWeight:700}}>🏁 Тавиачийн дугаар</span>
+                              <span style={{fontFamily:"'Cinzel',serif",fontSize:"20px",fontWeight:700,color:"#2ecc71"}}>#{taviachNum}</span>
+                            </div>
+                          )}
                           <div style={{display:"inline-block",background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"6px",padding:"2px 8px",fontSize:"11px",color:"#f5d882",marginBottom:"6px"}}>{h.ageGroupName}</div>
                           <div style={{fontSize:"12px",color:"rgba(255,255,255,.6)",lineHeight:1.6}}>
                             Уяач: {h.uyaachName||"—"}<br/>
