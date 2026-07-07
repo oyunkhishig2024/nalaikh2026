@@ -1022,6 +1022,49 @@ export default function App() {
                 <input type="text" placeholder="" value={hForm.uyaachTitle||""} onChange={e=>setField("uyaachTitle",cyrilOnly(e.target.value))}/>
                 <label>Уяачийн харъяалал</label>
                 <input type="text" placeholder="Уяачийн аймаг, сум" value={hForm.uyaachRegion||""} onChange={e=>setField("uyaachRegion",cyrilOnly(e.target.value))}/>
+
+                {/* ── МОРЬ ТАВИАЧ ── */}
+                <div style={{background:"rgba(232,192,96,.08)",border:"1px solid rgba(232,192,96,.25)",borderRadius:"14px",padding:"16px",margin:"8px 0"}}>
+                  <div style={{fontWeight:700,fontSize:"14px",marginBottom:"4px",color:"var(--gold)"}}>🏁 Морь тавиач</div>
+                  <div style={{fontSize:"12px",color:"rgba(255,255,255,.5)",marginBottom:"12px",lineHeight:1.6}}>
+                    Дугаар: 1–50 · Нэг дугаар нэг л удаа · <strong style={{color:"#e8c060"}}>30,000₮</strong>
+                  </div>
+                  {!hForm.taviachNum ? (
+                    <div style={{display:"flex",gap:"10px"}}>
+                      <button type="button" className="btn-gold" style={{flex:1,marginTop:0,fontSize:"14px"}} onClick={async()=>{
+                        try {
+                          const {getFirestore,doc,runTransaction} = await import("firebase/firestore");
+                          const db2 = getFirestore();
+                          const tRef = doc(db2,"meta","taviach_sequences");
+                          const num = await runTransaction(db2, async(tx)=>{
+                            const snap = await tx.get(tRef);
+                            if(!snap.exists()){tx.set(tRef,{nextTaviach:2});return 1;}
+                            const n = snap.data().nextTaviach;
+                            if(n>50){throw new Error("Тавиачийн дугаар 50-аас хэтэрлээ!");}
+                            tx.update(tRef,{nextTaviach:n+1});
+                            return n;
+                          });
+                          setField("taviachNum", num);
+                          showToast(`Тавиачийн дугаар: ${num}`);
+                        } catch(e){
+                          showToast("Алдаа: "+(e.message||"Дугаар авахад алдаа гарлаа"));
+                        }
+                      }}>Тийм — 30,000₮</button>
+                      <button type="button" className="btn-outline" style={{flex:1}} onClick={()=>setField("taviachNum", 0)}>Үгүй</button>
+                    </div>
+                  ) : hForm.taviachNum > 0 ? (
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"10px",padding:"10px 14px"}}>
+                      <div>
+                        <div style={{fontSize:"11px",color:"rgba(255,255,255,.5)"}}>ТАВИАЧИЙН ДУГААР</div>
+                        <div style={{fontFamily:"'Cinzel',serif",fontSize:"28px",fontWeight:700,color:"#2ecc71"}}>#{hForm.taviachNum}</div>
+                      </div>
+                      <button type="button" onClick={()=>setField("taviachNum",null)} style={{background:"none",border:"1px solid rgba(255,255,255,.2)",borderRadius:"8px",padding:"6px 12px",color:"rgba(255,255,255,.4)",cursor:"pointer",fontSize:"12px"}}>Цуцлах</button>
+                    </div>
+                  ) : (
+                    <div style={{textAlign:"center",fontSize:"13px",color:"rgba(255,255,255,.4)",padding:"8px"}}>✓ Тавиач авахгүй</div>
+                  )}
+                </div>
+
                 <label>Уралдаанч хүүхдийн овог *</label>
                 <input type="text" placeholder="Овог" value={hForm.riderSurname||""} onChange={e=>setField("riderSurname",cyrilOnly(e.target.value))}/>
                 {hFormErr.riderSurname&&<p className="err-msg">⚠ {hFormErr.riderSurname}</p>}
@@ -1215,7 +1258,7 @@ export default function App() {
                   <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,.08)",fontSize:"13px"}}>
                     <span style={{color:"var(--white-dim)"}}>Дүн</span>
                     <span style={{fontWeight:700,color:"var(--gold)",fontSize:"15px"}}>
-                      {((flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone&&h.needsPayment!==false).length*30000)+(taviachNum>0?30000:0)).toLocaleString()}₮
+                      {((flatHorses.filter(h=>h.paid&&h.ownerPhone===user?.phone&&h.needsPayment!==false).length*30000)+(pendingHorses.some(h=>h.taviachNum>0)?30000:0)).toLocaleString()}₮
                     </span>
                   </div>
                   <div style={{padding:"8px 0 2px",fontSize:"13px"}}>
@@ -1299,10 +1342,10 @@ export default function App() {
                         </div>
                         <div style={{flex:1}}>
                           <div style={{fontWeight:700,fontSize:"16px",marginBottom:"4px"}}>{h.horseName}</div>
-                          {taviachNum>0 && (
+                          {h.taviachNum>0 && (
                             <div style={{marginTop:"6px",padding:"6px 10px",background:"rgba(39,174,96,.12)",border:"1px solid rgba(39,174,96,.3)",borderRadius:"8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                               <span style={{fontSize:"12px",color:"#2ecc71",fontWeight:700}}>🏁 Тавиачийн дугаар</span>
-                              <span style={{fontFamily:"'Cinzel',serif",fontSize:"20px",fontWeight:700,color:"#2ecc71"}}>#{taviachNum}</span>
+                              <span style={{fontFamily:"'Cinzel',serif",fontSize:"20px",fontWeight:700,color:"#2ecc71"}}>#{h.taviachNum}</span>
                             </div>
                           )}
                           <div style={{display:"inline-block",background:"rgba(232,192,96,.15)",border:"1px solid rgba(232,192,96,.3)",borderRadius:"6px",padding:"2px 8px",fontSize:"11px",color:"#f5d882",marginBottom:"6px"}}>{h.ageGroupName}</div>
