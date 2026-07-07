@@ -627,16 +627,19 @@ export default function App() {
     const headers = [
       "Дугаар","Морины нэр","Зүс","Насны ангилал",
       "Эзний нэр","Эзний цол","Эзний харъяалал",
-      "Уяачийн нэр","Уяачийн цол",
+      "Уяачийн нэр","Уяачийн цол","Уяачийн харъяалал",
       "Уралдаанч овог","Уралдаанч нэр","Уралдаанчийн сургууль","Уралдаанчийн нас","Өмнөх амжилт",
+      "Тавиачийн дугаар","Тавиачийн төлбөр",
       "Төлбөр","Зөвшөөрөл","Бүртгэсэн огноо"
     ];
     const rows = flatHorses.map(h=>[
       h.number, h.horseName, h.horseColor||"",
       h.ageGroupName,
       h.ownerName, h.ownerTitle||"", h.ownerRegion||"",
-      h.uyaachName||"", h.uyaachTitle||"",
+      h.uyaachName||"", h.uyaachTitle||"", h.uyaachRegion||"",
       h.riderSurname||"", h.riderName, h.riderSchool||"", h.riderAge||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," "),
+      h.taviachNum>0 ? h.taviachNum : "—",
+      h.taviachNum>0 ? "30,000₮" : "—",
       h.paid?"Төлсөн":"Хүлээгдэж буй",
       h.approved?"Зөвшөөрсөн":"Үгүй",
       h.id ? new Date(h.id).toLocaleDateString("mn-MN") : ""
@@ -1024,7 +1027,7 @@ export default function App() {
                     <div style={{display:"flex",gap:"10px"}}>
                       <button type="button" className="btn-gold" style={{flex:1,marginTop:0,fontSize:"14px"}} onClick={async()=>{
                         try {
-                          const {getFirestore,doc,runTransaction,setDoc} = await import("firebase/firestore");
+                          const {getFirestore,doc,runTransaction} = await import("firebase/firestore");
                           const db2 = getFirestore();
                           const tRef = doc(db2,"meta","taviach_sequences");
                           const num = await runTransaction(db2, async(tx)=>{
