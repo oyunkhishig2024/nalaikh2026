@@ -105,13 +105,20 @@ export async function registerHorse(userId, phone, ageGroupId, ageGroupName, for
   const mySnap = await getDocs(myQ);
   const myHorses = mySnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // First number this user ever received
-  const myFirstNumber = myHorses.length > 0 ? myHorses[0].number : null;
+  // First number this user ever received (minimum)
+  const myNumbers = myHorses.map(h => h.number).filter(Boolean);
+  const myFirstNumber = myNumbers.length > 0 ? Math.min(...myNumbers) : null;
 
   // Horses in this specific age group
   const sameAge = myHorses.filter(h => h.ageGroupId === ageGroupId);
 
-  const reuseNumber  = myFirstNumber && sameAge.length === 0;
+  // Conflict check before reusing number
+  let reuseNumber = !!(myFirstNumber && sameAge.length === 0);
+  if (reuseNumber && myFirstNumber) {
+    const cQ = query(horsesCol, where('number', '==', myFirstNumber));
+    const cSnap = await getDocs(cQ);
+    if (cSnap.docs.some(d => d.data().ownerPhone !== phone)) reuseNumber = false;
+  }
   const number       = reuseNumber ? myFirstNumber : await getNextHorseNumber();
   const needsPayment = !reuseNumber;
 
