@@ -46,10 +46,23 @@ async function ensureSeq() {
 
 /** Atomically grab the next horse number */
 async function getNextHorseNumber() {
-  await ensureSeq();
   return await runTransaction(db, async (tx) => {
     const snap = await tx.get(seqRef);
-    const next = snap.data().nextHorse;
+    if (!snap.exists()) {
+      tx.set(seqRef, { nextHorse: 2, reservedNumbers: [] });
+      return 1;
+    }
+    const data = snap.data();
+    const reserved = (data.reservedNumbers || []).filter(n => typeof n === 'number');
+    if (reserved.length > 0) {
+      const sorted = [...reserved].sort((a, b) => a - b);
+      const num = sorted[0];
+      const remaining = sorted.slice(1);
+      tx.update(seqRef, { reservedNumbers: remaining });
+      return num;
+    }
+    const next = data.nextHorse || 1;
+    if (next > 150) throw new Error("Бүртгэлийн дугаар 150-аас хэтэрлээ!");
     tx.update(seqRef, { nextHorse: next + 1 });
     return next;
   });
