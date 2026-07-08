@@ -1652,7 +1652,7 @@ export default function App() {
                           <div className="horse-name">{h.horseName} <span className="tag">{h.ageGroupName}</span></div>
                           <div className="horse-meta">Эзэн: {h.ownerName} · Уяач: {h.uyaachName||"—"} · Уралдаанч: {h.riderName}</div>
                         </div>
-                        {h.paid?<span className="status-paid">✓ Төлсөн</span>:<span className="status-pend">⏳ Хүлээгдэж буй</span>}
+                        <div style={{display:"flex",gap:"6px",flexDirection:"column",alignItems:"flex-end"}}>{h.paid&&!h.approved&&<button style={{background:"#e8c060",border:"none",borderRadius:"8px",padding:"7px 14px",color:"#0a1a5e",fontSize:"12px",fontWeight:700,cursor:"pointer"}} onClick={e=>{e.stopPropagation();adminApprove(h);}}>✓ Зөвшөөрөх</button>}{h.approved&&<span style={{color:"#2ecc71",fontSize:"11px",fontWeight:700}}>✅ Зөвшөөрсөн</span>}{!h.paid&&<span style={{color:"#ff8a80",fontSize:"11px"}}>⏳ Төлөөгүй</span>}<button style={{background:"rgba(192,57,43,.2)",border:"1px solid rgba(192,57,43,.4)",borderRadius:"8px",padding:"4px 8px",color:"#ff8a80",fontSize:"11px",cursor:"pointer"}} onClick={e=>{e.stopPropagation();if(window.confirm("Устгах уу?")){adminReject(h);}}}>🗑</button></div>
                       </div>
                     ))
                   }
