@@ -628,21 +628,18 @@ export default function App() {
       "Дугаар","Морины нэр","Зүс","Насны ангилал",
       "Эзний нэр","Эзний цол","Эзний харъяалал",
       "Уяачийн нэр","Уяачийн цол","Уяачийн харъяалал",
-      "Уралдаанч овог","Уралдаанч нэр","Уралдаанчийн сургууль","Уралдаанчийн нас","Өмнөх амжилт",
+      "Уралдаанч овог","Уралдаанч нэр","Уралдаанчийн сургууль","Уралдаанчийн нас",
       "Тавиачийн дугаар","Тавиачийн төлбөр",
-      "Төлбөр","Зөвшөөрөл","Бүртгэсэн огноо"
+      "Морины тамга","Өмнөх амжилт"
     ];
     const rows = flatHorses.map(h=>[
-      h.number, h.horseName, h.horseColor||"",
-      h.ageGroupName,
-      h.ownerName, h.ownerTitle||"", h.ownerRegion||"",
+      h.number, h.horseName||"", h.horseColor||"", h.ageGroupName||"",
+      h.ownerName||"", h.ownerTitle||"", h.ownerRegion||"",
       h.uyaachName||"", h.uyaachTitle||"", h.uyaachRegion||"",
-      h.riderSurname||"", h.riderName, h.riderSchool||"", h.riderAge||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," "),
-      h.taviachNum>0 ? h.taviachNum : "—",
-      h.taviachNum>0 ? "30,000₮" : "—",
-      h.paid?"Төлсөн":"Хүлээгдэж буй",
-      h.approved?"Зөвшөөрсөн":"Үгүй",
-      h.id ? new Date(h.id).toLocaleDateString("mn-MN") : ""
+      h.riderSurname||"", h.riderName||"", h.riderSchool||"", h.riderAge||"",
+      h.taviachNum>0 ? h.taviachNum : "",
+      h.taviachNum>0 ? "30,000₮" : "",
+      h.horseMark||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," ")
     ].map(v=>
       typeof v==="string" && (v.includes(",") || v.includes('"') || v.includes("\n"))
         ? `"${v.replace(/"/g,'""')}"`
