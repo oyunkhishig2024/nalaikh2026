@@ -629,7 +629,7 @@ export default function App() {
       "Эзний нэр","Эзний цол","Эзний харъяалал",
       "Уяачийн нэр","Уяачийн цол","Уяачийн харъяалал",
       "Уралдаанч овог","Уралдаанч нэр","Уралдаанчийн сургууль","Уралдаанчийн нас",
-      "Тавиачийн дугаар","Тавиачийн төлбөр",
+      "Морины тамга","Тавиачийн дугаар","Тавиачийн төлбөр",
       "Морины тамга","Өмнөх амжилт"
     ];
     const rows = flatHorses.map(h=>[
@@ -637,6 +637,7 @@ export default function App() {
       h.ownerName||"", h.ownerTitle||"", h.ownerRegion||"",
       h.uyaachName||"", h.uyaachTitle||"", h.uyaachRegion||"",
       h.riderSurname||"", h.riderName||"", h.riderSchool||"", h.riderAge||"",
+      h.horseMark||"",
       h.taviachNum>0 ? h.taviachNum : "",
       h.taviachNum>0 ? "30,000₮" : "",
       h.horseMark||"", (h.history||"").replace(/,/g,"；").replace(/\n/g," ")
